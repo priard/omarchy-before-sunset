@@ -5,6 +5,27 @@ Notable changes to Before Sunset.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-08-21
+
+### Added
+
+- **The schedule bar shades the twilight.** Either side of the day block, the
+  bar now fades out across the real span of twilight — from the boundary to
+  where the sky finally runs out of light, eighteen degrees down. Today at
+  this latitude that is two and a half hours the bar previously drew as flat
+  night.
+
+  It makes the Boundary control explain itself: the shading is the range the
+  turn can be moved across, so switching from Horizon to Civil visibly steps
+  the line along a span you can already see.
+
+  The day block keeps its hard edges. A theme switch is a step — everything
+  repaints at once — and softening that edge would draw a fade that does not
+  happen. What is gradual is the light, which is what the shading shows.
+
+  Where there is no astronomical twilight, which at these latitudes means
+  midsummer, the shading simply is not drawn.
+
 ## [0.6.1] - 2026-08-21
 
 ### Added

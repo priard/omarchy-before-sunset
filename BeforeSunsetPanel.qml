@@ -37,6 +37,8 @@ Panel {
   readonly property string fixedDay: service ? String(service.fixedDay) : "07:00"
   readonly property string fixedNight: service ? String(service.fixedNight) : "19:00"
   readonly property bool wallpaperRenderable: service ? service.wallpaperRenderable === true : true
+  readonly property real twilightDawn: service ? service.astronomicalDawn : 0
+  readonly property real twilightDusk: service ? service.astronomicalDusk : 0
 
   readonly property string twilight: service ? String(service.twilight) : "official"
   readonly property int sunriseOffsetMinutes: service ? service.sunriseOffsetMinutes : 0
@@ -589,21 +591,59 @@ Panel {
     // Same axis and same geometry as the night light strip below it — both run
     // midnight to midnight, and two bars describing the same day should not
     // look like they came from different panels.
+    //
+    // The day block keeps hard edges on purpose. A theme switch is a step: at
+    // the boundary everything repaints at once, and a soft edge here would
+    // draw a fade that does not happen. What does happen gradually is the
+    // light itself, and that is the shading either side — twilight, from the
+    // boundary out to where the sky finally runs out of it.
+    readonly property real nightTone: 0.10
+    readonly property real dayTone: 0.42
+    // Twilight stops short of the day tone so the boundary still reads as the
+    // step it is, rather than being swallowed by the shading.
+    readonly property real twilightPeak: 0.27
+
+    readonly property real dawnEdge: root.twilightDawn > 0 && root.twilightDawn < timeline.dayStart
+      ? root.twilightDawn : 0
+    readonly property real duskEdge: root.twilightDusk > 0 && root.twilightDusk > timeline.dayEnd
+      ? root.twilightDusk : 0
+
+    function toneAt(instant) {
+      if (instant >= dayStart && instant <= dayEnd) return dayTone
+
+      if (dawnEdge > 0 && instant >= dawnEdge && instant < dayStart)
+        return nightTone + (twilightPeak - nightTone) * ((instant - dawnEdge) / (dayStart - dawnEdge))
+
+      if (duskEdge > 0 && instant > dayEnd && instant <= duskEdge)
+        return nightTone + (twilightPeak - nightTone) * ((duskEdge - instant) / (duskEdge - dayEnd))
+
+      return nightTone
+    }
+
+    readonly property int slices: 96
+    readonly property real midnight: {
+      var moment = new Date(root.nowMs > 0 ? root.nowMs : Date.now())
+      return new Date(moment.getFullYear(), moment.getMonth(), moment.getDate()).getTime()
+    }
+
     Item {
       width: timeline.width
       height: Style.space(16)
 
-      Rectangle {
+      Row {
         anchors.fill: parent
-        color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.10)
-      }
 
-      Rectangle {
-        x: parent.width * timeline.dayFraction(timeline.dayStart)
-        width: Math.max(2, parent.width
-          * (timeline.dayFraction(timeline.dayEnd) - timeline.dayFraction(timeline.dayStart)))
-        height: parent.height
-        color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.42)
+        Repeater {
+          model: timeline.slices
+
+          Rectangle {
+            required property int index
+            width: timeline.width / timeline.slices
+            height: parent.height
+            color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b,
+              timeline.toneAt(timeline.midnight + ((index + 0.5) * 86400000 / timeline.slices)))
+          }
+        }
       }
 
       Rectangle {

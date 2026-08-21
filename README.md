@@ -120,6 +120,12 @@ offsets nudge one side without moving the other.
 
 *Fixed hours* takes a from/to pair.
 
+The strip shades the twilight either side of the day block, out to where the
+sky runs out of light. That span is the range `Boundary` can move the turn
+across, so the control shows its own reach before you touch it. The block
+itself keeps hard edges: a theme switch is a step, and drawing it as a fade
+would be drawing something that does not happen.
+
 ![The sun schedule, with the day drawn as a strip and the boundary and offsets beneath it](docs/schedule-sun.png)
 
 *Light sensor* reads the ambient light sensor and decides from the room rather

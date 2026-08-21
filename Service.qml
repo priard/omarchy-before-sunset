@@ -733,6 +733,16 @@ Item {
   property real todaySunrise: 0
   property real todaySunset: 0
 
+  // The far edge of twilight, where the sun is 18 degrees down and the sky is
+  // finally out of light. Together with the effective boundary these bracket
+  // the span the Boundary control can move the turn across — which is what the
+  // schedule bar shades, so the choice is visible before it is made.
+  //
+  // Zero where there is none: inside the polar circles, and at these latitudes
+  // around midsummer, astronomical twilight simply does not end.
+  property real astronomicalDawn: 0
+  property real astronomicalDusk: 0
+
   property bool started: false
 
   // Every installed theme with the half of the day it reads as. Only needed to
@@ -849,6 +859,13 @@ Item {
 
     todaySunrise = up ? up.getTime() + (sunriseOffsetMinutes * 60000) : 0
     todaySunset = down ? down.getTime() + (sunsetOffsetMinutes * 60000) : 0
+
+    var deep = Sun.zenithFor("astronomical")
+    var dawn = Sun.sunrise(now, latitude, longitude, deep)
+    var dusk = Sun.sunset(now, latitude, longitude, deep)
+
+    astronomicalDawn = dawn ? dawn.getTime() : 0
+    astronomicalDusk = dusk ? dusk.getTime() : 0
   }
 
   function evaluate() {
@@ -1409,6 +1426,10 @@ Item {
         nextTransition: root.nextTransition ? new Date(root.nextTransition).toISOString() : null,
         sunrise: root.todaySunrise ? new Date(root.todaySunrise).toISOString() : null,
         sunset: root.todaySunset ? new Date(root.todaySunset).toISOString() : null,
+        twilight: {
+          dawn: root.astronomicalDawn ? new Date(root.astronomicalDawn).toISOString() : null,
+          dusk: root.astronomicalDusk ? new Date(root.astronomicalDusk).toISOString() : null
+        },
         location: root.hasLocation
           ? { name: root.locationName, latitude: root.latitude, longitude: root.longitude }
           : null,
