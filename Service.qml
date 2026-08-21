@@ -184,6 +184,9 @@ Item {
   // this plugin strikes with a manual choice.
   property real nightlightHoldUntil: 0
 
+  // A toggle value seen once and awaiting confirmation. See reconcileNightlight.
+  property int nightlightExternalCandidate: -1
+
   // Re-evaluated on the tick, so the panel can show the hold and see it end.
   property real nightlightHeldUntil: 0
 
@@ -254,6 +257,32 @@ Item {
     return value
   }
 
+  // Choosing a mode in the panel is an instruction, and it outranks a hold that
+  // came from the toggle. Without this the hold sat there until the day turned,
+  // and every button in the section looked dead.
+  onNightlightModeChanged: {
+    nightlightHoldUntil = 0
+    nightlightHeldUntil = 0
+    Qt.callLater(releaseNightlight)
+  }
+
+  // Switching off has to hand the screen back, not walk away from it. We are
+  // the reason it is warm; leaving it warm and stopping is the one outcome
+  // nobody asked for.
+  function releaseNightlight() {
+    if (nightlightMode !== "off") {
+      applyNightlight()
+      return
+    }
+
+    if (nightlightPushed < 0 || nightlightActual === nightlightDay) return
+
+    nightlightPushed = nightlightDay
+    nightlightExternalCandidate = -1
+    nightlightApply.command = [pluginFile("bin/auto-theme-nightlight"), String(nightlightDay)]
+    nightlightApply.running = true
+  }
+
   function applyNightlight() {
     if (nightlightHoldUntil > 0) {
       if (Date.now() < nightlightHoldUntil) {
@@ -273,6 +302,7 @@ Item {
     if (nightlightPushed >= 0 && Math.abs(target - nightlightPushed) < 8) return
 
     nightlightPushed = target
+    nightlightExternalCandidate = -1
     nightlightApply.command = [pluginFile("bin/auto-theme-nightlight"), String(target)]
     nightlightApply.running = true
   }
@@ -337,14 +367,31 @@ Item {
     // not yet the one we recorded.
     if (nightlightApply.running) return
 
-    if (Math.abs(nightlightActual - nightlightPushed) < 8) return
+    if (Math.abs(nightlightActual - nightlightPushed) < 8) {
+      nightlightExternalCandidate = -1
+      return
+    }
 
     if (nightlightActual !== nightlightToggleOff && nightlightActual !== nightlightToggleOn) {
       // Not the toggle. Something else moved it, or our own write is still
       // catching up: re-baseline and carry on rather than guess.
+      nightlightExternalCandidate = -1
       nightlightPushed = nightlightActual
       return
     }
+
+    // The value is one the toggle writes — but so is the value we are on our
+    // way to, and hyprctl does not report a write the instant we make it. A
+    // reading left over from just before our own change looks exactly like
+    // somebody pressing the toggle, and acting on it rewrites the very setting
+    // that caused it. A real press is still there on the next look; a stale
+    // reading is not.
+    if (nightlightExternalCandidate !== nightlightActual) {
+      nightlightExternalCandidate = nightlightActual
+      return
+    }
+
+    nightlightExternalCandidate = -1
 
     nightlightPushed = nightlightActual
 

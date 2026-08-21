@@ -5,6 +5,25 @@ Notable changes to Auto Theme.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-08-21
+
+### Fixed
+
+- **The night light buttons work again.** Pressing Omarchy's toggle set a hold
+  that nothing in the panel could clear, so Off, Auto and Always all appeared
+  dead until the day next turned over, and the heading kept reporting "held"
+  while the mode said Auto. Choosing a mode is an instruction and now outranks
+  the hold.
+- **Our own write is no longer mistaken for someone pressing the toggle.**
+  hyprctl does not report a change the instant it is made, so the reading left
+  over from just before one of our writes looked exactly like the toggle being
+  pressed — and acting on it rewrote the setting that had caused it, flipping
+  the mode back moments after it was chosen. A toggle value now has to survive
+  a second look before it counts; a stale reading does not.
+- **Switching to Off hands the screen back** instead of walking away from it
+  still warm. We are the reason it is warm; leaving it that way and stopping
+  was the one outcome nobody asked for.
+
 ## [0.5.0] - 2026-08-21
 
 ### Fixed
