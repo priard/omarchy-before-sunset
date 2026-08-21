@@ -125,6 +125,237 @@ Item {
 
   readonly property bool notifyOnChange: setting("notify", false) === true
 
+  // ---------------------------------------------------------- night light
+
+  readonly property var nightlightSettings: setting("nightlight", ({}))
+
+  // "off" leaves the screen alone and lets Omarchy's toggle behave exactly as
+  // it always has. "auto" follows the day. "on" holds the warm temperature
+  // around the clock. Deliberately separate from the theme's own mode: warming
+  // the screen after dark and pinning a theme are different wishes.
+  readonly property string nightlightMode: {
+    var value = String(nightlightSettings ? (nightlightSettings.mode || "") : "").toLowerCase()
+    if (value === "auto" || value === "on" || value === "off") return value
+    // Older configs carried a plain on/off flag.
+    if (nightlightSettings && nightlightSettings.enabled === true) return "auto"
+    return "off"
+  }
+
+  readonly property bool nightlightEnabled: nightlightMode !== "off"
+
+  function nightlightKelvin(key, fallback) {
+    var value = nightlightSettings ? parseInt(nightlightSettings[key], 10) : NaN
+    if (isNaN(value)) return fallback
+    return Math.max(1000, Math.min(20000, value))
+  }
+
+  // 6500 K is hyprsunset's neutral and 4000 K is what omarchy-toggle-nightlight
+  // means by "on". Matching both means our warmest looks exactly like theirs,
+  // and the bar indicator — which calls anything under 6000 K enabled — agrees
+  // with us without being told.
+  readonly property int nightlightDay: nightlightKelvin("day", 6500)
+  readonly property int nightlightNight: nightlightKelvin("night", 4000)
+
+  // Long enough that the change is never a step you notice. Three quarters of
+  // an hour puts each minute's move around fifty kelvin, which is below what
+  // the eye picks up against a slowly darkening room.
+  readonly property int nightlightTransitionMinutes: {
+    var value = nightlightSettings ? parseInt(nightlightSettings.transitionMinutes, 10) : NaN
+    return isNaN(value) || value < 1 ? 45 : Math.min(360, value)
+  }
+
+  // How far ahead of the turn the warming starts. Zero means it begins as the
+  // day turns over and finishes later; raise it to be already warm by then.
+  readonly property int nightlightLeadMinutes: {
+    var value = nightlightSettings ? parseInt(nightlightSettings.leadMinutes, 10) : NaN
+    return isNaN(value) || value < 0 ? 0 : Math.min(360, value)
+  }
+
+  // Last value we wrote, so a temperature that does not match is someone else's
+  // doing — the bar toggle, the menu, or hyprctl by hand.
+  property int nightlightPushed: -1
+  property int nightlightActual: -1
+  property bool nightlightRamping: false
+
+  // Reaching for the night light toggle is a statement about right now, not
+  // about the schedule. Turning it on in the afternoon and watching it undo
+  // itself a minute later would make the toggle look broken, so the schedule
+  // stands aside until the day next turns over — the same bargain the rest of
+  // this plugin strikes with a manual choice.
+  property real nightlightHoldUntil: 0
+
+  // When the current side began, for the cases the schedule cannot date:
+  // a pinned mode and the light sensor have no transition instant to speak of.
+  property real sideChangedAt: 0
+
+  onAutoSideChanged: sideChangedAt = Date.now()
+
+  // Smoothstep rather than a straight line: the ends taper, so the ramp does
+  // not start or stop with a visible corner.
+  function easeProgress(progress) {
+    var p = Math.max(0, Math.min(1, progress))
+    return p * p * (3 - 2 * p)
+  }
+
+  function mixKelvin(from, to, progress) {
+    return Math.round(from + (to - from) * easeProgress(progress))
+  }
+
+  // -1 means "leave the screen alone".
+  function nightlightTarget() {
+    if (nightlightMode === "off") return -1
+    if (nightlightMode === "on") return nightlightNight
+    if (autoSide === "") return -1
+
+    var now = Date.now()
+    var lead = nightlightLeadMinutes * 60000
+    var ramp = nightlightTransitionMinutes * 60000
+    var span = lead + ramp
+
+    var settled = autoSide === "night" ? nightlightNight : nightlightDay
+    var previous = autoSide === "night" ? nightlightDay : nightlightNight
+
+    // Running up to the next turn, with a lead configured: start moving toward
+    // the temperature that turn will bring.
+    if (lead > 0 && autoNext > 0 && autoNext - now <= lead) {
+      nightlightRamping = true
+      return mixKelvin(settled, previous, (lead - (autoNext - now)) / span)
+    }
+
+    var since = autoSince > 0 ? autoSince : sideChangedAt
+    if (since > 0 && now - since < ramp) {
+      nightlightRamping = true
+      return mixKelvin(previous, settled, (lead + (now - since)) / span)
+    }
+
+    nightlightRamping = false
+    return settled
+  }
+
+  function applyNightlight() {
+    if (nightlightHoldUntil > 0) {
+      if (Date.now() < nightlightHoldUntil) return
+      nightlightHoldUntil = 0
+    }
+
+    var target = nightlightTarget()
+    if (target < 0) return
+
+    // A whole ramp is only a couple of thousand kelvin; writing every few of
+    // them would be pure chatter for a change nobody can see.
+    if (nightlightPushed >= 0 && Math.abs(target - nightlightPushed) < 8) return
+
+    nightlightPushed = target
+    nightlightApply.command = [pluginFile("bin/auto-theme-nightlight"), String(target)]
+    nightlightApply.running = true
+  }
+
+  // The bar indicator and the menu toggle both read the live temperature and
+  // call anything under 6000 K "on". They only re-read when told to, so a ramp
+  // they were not asked about would leave their icon lying.
+  Process {
+    id: nightlightApply
+    onExited: Quickshell.execDetached(["omarchy-shell", "-q", "nightlight", "refresh"])
+  }
+
+  Process {
+    id: nightlightProbe
+    command: [root.pluginFile("bin/auto-theme-nightlight")]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var reading
+        try {
+          reading = JSON.parse(String(text || "{}"))
+        } catch (e) {
+          return
+        }
+        if (reading.temperature === null || reading.temperature === undefined) return
+
+        root.nightlightActual = Number(reading.temperature)
+        root.reconcileNightlight()
+      }
+    }
+  }
+
+  // Someone reaching for the night light toggle is stating a preference, and it
+  // should mean the same thing here as it does there: turning it on hands us
+  // the wheel, turning it off takes it back. Their toggle only knows two
+  // values, so those two are the tell.
+  readonly property int nightlightIdentity: 6000
+
+  // omarchy-toggle-nightlight only ever writes these two. A ramp of ours passes
+  // through hundreds of values and lands on whatever the user configured, so a
+  // reading that is exactly one of these, and not what we last wrote, is the
+  // toggle and nothing else. Without this test our own in-flight write reads
+  // back as somebody switching the night light off, which cancels the very ramp
+  // that produced it.
+  readonly property int nightlightToggleOff: 6500
+  readonly property int nightlightToggleOn: 4000
+
+  function reconcileNightlight() {
+    if (nightlightActual < 0) return
+
+    // Nothing of ours on screen yet: adopt what is there as the starting point
+    // rather than reading it as a decision.
+    if (nightlightPushed < 0) {
+      nightlightPushed = nightlightActual
+      return
+    }
+
+    // A write of ours may still be settling; the value on screen is ours, just
+    // not yet the one we recorded.
+    if (nightlightApply.running) return
+
+    if (Math.abs(nightlightActual - nightlightPushed) < 8) return
+
+    if (nightlightActual !== nightlightToggleOff && nightlightActual !== nightlightToggleOn) {
+      // Not the toggle. Something else moved it, or our own write is still
+      // catching up: re-baseline and carry on rather than guess.
+      nightlightPushed = nightlightActual
+      return
+    }
+
+    var turnedOff = nightlightActual === nightlightToggleOff
+    if (turnedOff === (nightlightMode === "off")) {
+      // Already agrees with us; just re-baseline.
+      nightlightPushed = nightlightActual
+      return
+    }
+
+    nightlightPushed = nightlightActual
+    // Hold what they just chose until the next transition. Turning it off also
+    // stops us driving at all, so the hold only really matters when it was
+    // turned on at a time the schedule would have wanted it neutral.
+    nightlightHoldUntil = autoNext > 0 ? autoNext : Date.now() + 43200000
+    persist({ nightlight: nightlightConfig({ mode: turnedOff ? "off" : "auto" }) })
+  }
+
+  function nightlightConfig(changes) {
+    var next = ({
+      mode: nightlightMode,
+      day: nightlightDay,
+      night: nightlightNight,
+      transitionMinutes: nightlightTransitionMinutes,
+      leadMinutes: nightlightLeadMinutes
+    })
+    for (var change in changes) next[change] = changes[change]
+    return next
+  }
+
+  function probeNightlight() {
+    if (!nightlightProbe.running) nightlightProbe.running = true
+  }
+
+  // Mid-ramp the minute tick would move the temperature in fifty-kelvin steps.
+  // Ten seconds makes each step small enough to be invisible.
+  Timer {
+    interval: 10000
+    repeat: true
+    running: root.nightlightEnabled && root.nightlightRamping
+    onTriggered: root.applyNightlight()
+  }
+
   // --------------------------------------------------------- night volume
 
   readonly property var volumeSettings: setting("volume", ({}))
@@ -155,24 +386,24 @@ Item {
   // lamp being switched on is not the morning, and nobody wants the room
   // getting louder because someone opened the blinds.
   function noteScheduledSide() {
-    if (scheduleSource !== "sun" && scheduleSource !== "fixed") {
+    if (autoSource !== "sun" && autoSource !== "fixed") {
       lastScheduledSide = ""
       return
     }
 
-    if (side === "") return
+    if (autoSide === "") return
 
     // First evaluation after a start or a schedule change establishes where we
     // are; it is not a transition and must not fade anything.
     if (lastScheduledSide === "") {
-      lastScheduledSide = side
+      lastScheduledSide = autoSide
       return
     }
 
-    if (side === lastScheduledSide) return
+    if (autoSide === lastScheduledSide) return
 
-    lastScheduledSide = side
-    fadeVolumeFor(side)
+    lastScheduledSide = autoSide
+    fadeVolumeFor(autoSide)
   }
 
   function fadeVolumeFor(newSide) {
@@ -406,22 +637,22 @@ Item {
 
   // ------------------------------------------------------------- scheduling
 
-  function computeSchedule() {
+  // What the schedule says, always — even while the theme is pinned to one half
+  // or switched off entirely. Pinning the theme is a statement about the theme;
+  // it should not decide whether the screen warms up after dark or whether the
+  // volume comes down at night. Those follow the day itself.
+  property var autoSchedule: null
+  property string autoSource: ""
+
+  readonly property string autoSide: autoSchedule ? String(autoSchedule.mode) : ""
+  readonly property real autoNext: autoSchedule && autoSchedule.next ? autoSchedule.next : 0
+  readonly property real autoSince: autoSchedule && autoSchedule.since ? autoSchedule.since : 0
+
+  function computeAutoSchedule() {
     var now = new Date()
 
-    if (configMode === "off") {
-      scheduleSource = ""
-      return null
-    }
-
-    // Pinned to one slot. No transitions, so nothing to wait for.
-    if (configMode === "day" || configMode === "night") {
-      scheduleSource = "pinned"
-      return { mode: configMode, since: null, next: null }
-    }
-
     if (configAutoMode === "sensor" && sensorUsable) {
-      scheduleSource = "sensor"
+      autoSource = "sensor"
       return { mode: sensorSide, since: null, next: null }
     }
 
@@ -435,7 +666,7 @@ Item {
         sunsetOffsetMinutes: sunsetOffsetMinutes
       })
       if (sun) {
-        scheduleSource = "sun"
+        autoSource = "sun"
         return sun
       }
       // Inside the polar circles there are stretches with no sunrise or sunset
@@ -444,8 +675,25 @@ Item {
     }
 
     var fixed = Sun.fixedSchedule(now, fixedDay, fixedNight)
-    scheduleSource = fixed ? "fixed" : ""
+    autoSource = fixed ? "fixed" : ""
     return fixed
+  }
+
+  // What the theme follows, which is the schedule unless the user has pinned a
+  // half or turned the plugin off.
+  function computeSchedule() {
+    if (configMode === "off") {
+      scheduleSource = ""
+      return null
+    }
+
+    if (configMode === "day" || configMode === "night") {
+      scheduleSource = "pinned"
+      return { mode: configMode, since: null, next: null }
+    }
+
+    scheduleSource = autoSource
+    return autoSchedule
   }
 
   function refreshSunTimes() {
@@ -466,6 +714,7 @@ Item {
 
   function evaluate() {
     refreshSunTimes()
+    autoSchedule = computeAutoSchedule()
     schedule = computeSchedule()
     if (!schedule) {
       lastScheduledSide = ""
@@ -473,6 +722,8 @@ Item {
     }
 
     noteScheduledSide()
+    probeNightlight()
+    applyNightlight()
 
     // theme.name has not been read yet; acting now would fight whatever is on
     // screen without knowing what that is.
@@ -1009,6 +1260,8 @@ Item {
         autoMode: root.configAutoMode,
         side: root.side,
         source: root.scheduleSource,
+        autoSide: root.autoSide,
+        autoSource: root.autoSource,
         currentTheme: root.currentTheme,
         scheduledTheme: root.canonical(root.scheduledTheme),
         dayTheme: root.canonical(root.dayTheme),
@@ -1024,6 +1277,18 @@ Item {
         transparency: root.transparencyMemory,
         barTransparent: root.barTransparent,
         wallpaperRenderable: root.wallpaperRenderable,
+        nightlight: {
+          mode: root.nightlightMode,
+          day: root.nightlightDay,
+          night: root.nightlightNight,
+          transitionMinutes: root.nightlightTransitionMinutes,
+          leadMinutes: root.nightlightLeadMinutes,
+          target: root.nightlightTarget(),
+          actual: root.nightlightActual,
+          ramping: root.nightlightRamping,
+          heldUntil: root.nightlightHoldUntil > 0 && Date.now() < root.nightlightHoldUntil
+            ? new Date(root.nightlightHoldUntil).toISOString() : null
+        },
         volume: {
           night: root.nightVolume,
           day: root.dayVolume,

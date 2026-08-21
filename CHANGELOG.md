@@ -5,6 +5,32 @@ Notable changes to Auto Theme.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-08-21
+
+### Added
+
+- **The night light follows the day, gradually.** Omarchy ships an on/off
+  toggle with two fixed temperatures and nothing in between. The screen now
+  eases from neutral to warm across the turn of the day — three quarters of an
+  hour by default, smoothstepped so neither end arrives with a visible corner.
+  No step of it is large enough to notice.
+- **Three modes of its own: off, auto, always.** Deliberately separate from the
+  theme's mode, because warming the screen after dark and pinning a theme are
+  different wishes. Pinning the theme to Day no longer keeps the screen cold all
+  night. `off` leaves Omarchy's toggle behaving exactly as it always has.
+- **Shared with Omarchy's toggle, both ways.** Switching the night light on
+  there hands the schedule the wheel; switching it off takes it back. Our ramp
+  drives the same hyprsunset the toggle does, and the bar indicator is refreshed
+  after each step so its icon never lies about what is on screen.
+- Pressing that toggle at a time the schedule disagrees with holds your choice
+  until the day next turns over, rather than being undone a minute later.
+- Configurable warmth, span, and how far ahead of the turn to begin.
+
+### Changed
+
+- The schedule is now computed whether or not the theme follows it, so the
+  night light and the night volume keep working while a theme is pinned.
+
 ## [0.3.0] - 2026-08-21
 
 ### Added

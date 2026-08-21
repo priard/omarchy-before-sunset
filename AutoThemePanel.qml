@@ -116,6 +116,35 @@ Panel {
     return ""
   }
 
+  readonly property string nightlightMode: service ? String(service.nightlightMode) : "off"
+  readonly property bool nightlightEnabled: nightlightMode !== "off"
+  readonly property int nightlightDay: service ? service.nightlightDay : 6500
+  readonly property int nightlightNight: service ? service.nightlightNight : 4000
+  readonly property int nightlightTransitionMinutes: service ? service.nightlightTransitionMinutes : 45
+  readonly property int nightlightLeadMinutes: service ? service.nightlightLeadMinutes : 0
+  readonly property int nightlightActual: service ? service.nightlightActual : -1
+
+  function nightlightConfig(changes) {
+    return service ? service.nightlightConfig(changes) : ({})
+  }
+
+  readonly property string nightlightSummary: {
+    if (nightlightMode === "off") return "Off"
+    if (nightlightMode === "on") return "Always " + nightlightNight + " K"
+    return nightlightNight + " K over " + nightlightTransitionMinutes + " min"
+  }
+
+  // A rough guide, because kelvin means nothing to most people until they have
+  // seen it on their own screen.
+  readonly property string nightlightStrength: {
+    var k = nightlightNight
+    if (k >= 5500) return "barely there"
+    if (k >= 4500) return "gentle"
+    if (k >= 3800) return "comfortable"
+    if (k >= 3000) return "strong"
+    return "very strong"
+  }
+
   readonly property int nightVolume: service ? service.nightVolume : -1
   readonly property int dayVolume: service ? service.dayVolume : -1
   readonly property int volumeFadeSeconds: service ? service.volumeFadeSeconds : 20
@@ -1138,6 +1167,123 @@ Panel {
                 font.pixelSize: Style.font.caption
                 wrapMode: Text.WordWrap
               }
+            }
+          }
+
+          PanelSeparator { foreground: root.fg }
+
+          // ----------------------------------------------- night light
+
+          Disclosure {
+            title: "NIGHT LIGHT"
+            summary: root.nightlightSummary
+
+            ButtonGroup {
+              width: parent.width
+              options: [
+                { value: "off", label: "Off" },
+                { value: "auto", label: "Auto" },
+                { value: "on", label: "Always" }
+              ]
+              value: root.nightlightMode
+              foreground: root.fg
+              fontFamily: root.face
+              onChanged: function(value) { root.persist({ nightlight: root.nightlightConfig({ mode: value }) }) }
+            }
+
+            Text {
+              width: parent.width
+              text: {
+                var now = root.nightlightActual > 0 ? "Screen is at " + root.nightlightActual + " K. " : ""
+                if (root.nightlightMode === "off")
+                  return now + "Omarchy's own toggle is left to behave exactly as it always has."
+                if (root.nightlightMode === "on")
+                  return now + "Held warm around the clock, whatever the day is doing."
+                return now + "Follows the day on its own — pinning a theme does not stop it."
+              }
+              color: root.dim
+              font.family: root.face
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.WordWrap
+            }
+
+            Row {
+              visible: root.nightlightEnabled
+              width: parent.width
+              spacing: Style.space(12)
+
+              NumberField {
+                label: "Night K"
+                value: root.nightlightNight
+                from: 1500
+                to: 6500
+                stepSize: 100
+                foreground: root.fg
+                fontFamily: root.face
+                onModified: function(value) { root.persist({ nightlight: root.nightlightConfig({ night: value }) }) }
+              }
+
+              NumberField {
+                label: "Day K"
+                value: root.nightlightDay
+                from: 3000
+                to: 20000
+                stepSize: 100
+                foreground: root.fg
+                fontFamily: root.face
+                onModified: function(value) { root.persist({ nightlight: root.nightlightConfig({ day: value }) }) }
+              }
+            }
+
+            Row {
+              visible: root.nightlightMode === "auto"
+              width: parent.width
+              spacing: Style.space(12)
+
+              NumberField {
+                label: "Over (min)"
+                value: root.nightlightTransitionMinutes
+                from: 1
+                to: 360
+                stepSize: 5
+                foreground: root.fg
+                fontFamily: root.face
+                onModified: function(value) { root.persist({ nightlight: root.nightlightConfig({ transitionMinutes: value }) }) }
+              }
+
+              NumberField {
+                label: "Start early (min)"
+                value: root.nightlightLeadMinutes
+                from: 0
+                to: 360
+                stepSize: 5
+                foreground: root.fg
+                fontFamily: root.face
+                onModified: function(value) { root.persist({ nightlight: root.nightlightConfig({ leadMinutes: value }) }) }
+              }
+            }
+
+            Text {
+              visible: root.nightlightEnabled
+              width: parent.width
+              text: root.nightlightNight + " K is " + root.nightlightStrength
+                + ". 6500 K is neutral, 5000 barely shows, 4000 is comfortable for an "
+                + "evening, below 3000 most people find too much. The change is spread "
+                + "over the whole window, so no single minute of it is visible."
+              color: root.dim
+              font.family: root.face
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.WordWrap
+            }
+
+            Text {
+              width: parent.width
+              text: "Shares the night light with Omarchy's own toggle: switching it on there "
+                + "hands the schedule the wheel, switching it off takes it back."
+              color: root.dim
+              font.family: root.face
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.WordWrap
             }
           }
 

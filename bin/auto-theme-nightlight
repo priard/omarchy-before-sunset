@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# Read or set the screen colour temperature through hyprsunset.
+#
+# Same mechanism omarchy-toggle-nightlight and the shell's nightlight service
+# use, so the bar indicator and the menu toggle see our changes as their own:
+# they read the live temperature and call anything under 6000 K "on". Driving
+# hyprsunset directly rather than going through omarchy-toggle-nightlight is
+# deliberate — that command only flips between two fixed values, and a gradual
+# ramp needs to name its own.
+#
+# Usage:
+#   auto-theme-nightlight              print {"running","temperature"}
+#   auto-theme-nightlight <kelvin>     set the temperature
+
+set -uo pipefail
+
+wanted=${1:-}
+
+read_temperature() {
+  hyprctl hyprsunset temperature 2>/dev/null | grep -oE '^[0-9]+' | head -n1
+}
+
+if [[ -z $wanted ]]; then
+  temperature=$(read_temperature)
+  running=false
+  pgrep -x hyprsunset >/dev/null && running=true
+
+  if [[ $temperature =~ ^[0-9]+$ ]]; then
+    jq -n --argjson running "$running" --argjson temperature "$temperature" '{$running, $temperature}'
+  else
+    jq -n --argjson running "$running" '{$running, temperature: null}'
+  fi
+  exit 0
+fi
+
+[[ $wanted =~ ^[0-9]+$ ]] || { echo "usage: auto-theme-nightlight [kelvin]" >&2; exit 1; }
+# hyprsunset's own accepted range. Clamping beats hyprctl rejecting the call and
+# leaving the screen at whatever it happened to be.
+((wanted >= 1000)) || wanted=1000
+((wanted <= 20000)) || wanted=20000
+
+if ! pgrep -x hyprsunset >/dev/null; then
+  setsid uwsm-app -- hyprsunset >/dev/null 2>&1 &
+  sleep 1
+fi
+
+hyprctl hyprsunset temperature "$wanted" >/dev/null 2>&1

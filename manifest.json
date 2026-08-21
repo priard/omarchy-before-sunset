@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "priard.auto-theme",
   "name": "Auto Theme",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "author": "priard",
   "license": "MIT",
   "description": "Switch themes with the sun: one theme for the day half, another for the night half.",

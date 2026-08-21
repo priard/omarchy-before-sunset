@@ -173,6 +173,59 @@ If sensor mode is selected but no threshold has been set, or the sensor
 disappears, the schedule falls back to the sun or fixed hours rather than
 freezing: an unconfigured preference should not take the desktop down with it.
 
+## Warming the screen after dark
+
+Omarchy has a night light toggle: on or off, 4000 K or 6500 K, with nothing in
+between. This adds the part in between — the screen eases from one to the other
+across the turn of the day instead of stepping.
+
+Three modes, and they are its own, not the theme's:
+
+- **Off** — the plugin does not touch the night light, and Omarchy's toggle
+  behaves exactly as it always has.
+- **Auto** — follows the day, ramping across each turn.
+- **Always** — holds the warm temperature around the clock.
+
+Keeping this separate from the theme's mode matters: pinning a theme to Day
+says something about colours on screen, not about whether your eyes want a
+warmer picture at midnight. The schedule is computed either way, so the night
+light — and the night volume — keep working while a theme is pinned.
+
+### Choosing the numbers
+
+Kelvin means little until you have seen it on your own screen, so as a rough
+ladder:
+
+| | |
+|---|---|
+| 6500 K | neutral, what hyprsunset calls identity |
+| 5000 K | barely shows |
+| 4000 K | comfortable for an evening — the default, and what Omarchy's own toggle means by "on" |
+| 3400 K | strong |
+| 2700 K | most people find this too much for anything but reading |
+
+The span defaults to 45 minutes. That puts each minute's move around fifty
+kelvin, which is below what the eye picks up against a room that is itself
+getting darker — the whole point being that you never catch it happening. Twenty
+minutes is noticeable if you are looking; anything under ten is a step with
+extra stages.
+
+The ramp begins as the day turns over and finishes a span later. If you would
+rather already be warm by nightfall, **Start early** moves the beginning
+forward by that many minutes.
+
+### Sharing the toggle
+
+The ramp drives the same hyprsunset that Omarchy's toggle and bar indicator use,
+so they see our changes as their own — the indicator calls anything under
+6000 K "on". It only re-reads when told to, so it is refreshed after each step;
+otherwise its icon would lie.
+
+Going the other way: pressing that toggle switches this on or off to match. And
+because the toggle is a statement about right now, pressing it at a time the
+schedule disagrees with holds your choice until the day next turns over, rather
+than being undone a minute later.
+
 ## Easing the volume down at night
 
 Give the plugin a level and the output volume slides to it when the schedule
@@ -281,6 +334,7 @@ the same precedence the shell's own `updateEntryInline` uses.
 | `notify` | `false` | Send a desktop notification on each switch and each adoption. |
 | `sensor` | — | `{"threshold": 0, "hysteresis": 0.15, "dwellSeconds": 45, "device": ""}` for `autoMode: "sensor"`. A threshold of `0` means not calibrated yet; an empty `device` averages every sensor found. |
 | `volume` | — | `{"night": 25, "day": null, "fadeSeconds": 20}`. Percentages; `null` leaves that side alone. `0` is a real target, meaning silence. |
+| `nightlight` | — | `{"mode": "off", "day": 6500, "night": 4000, "transitionMinutes": 45, "leadMinutes": 0}`. `mode` is `off`, `auto`, or `on`. |
 
 Theme names accept either form: `"matte-black"` or `"Matte Black"`.
 
@@ -340,6 +394,7 @@ bin/auto-theme-bg-pick   pick a wallpaper from any theme's backgrounds
 bin/auto-theme-slot      resolve a slot's preview and wallpaper for the panel
 bin/auto-theme-sensor    read the ambient light sensor, if there is one
 bin/auto-theme-volume    ease the output volume to a level over a few seconds
+bin/auto-theme-nightlight  read or set the screen colour temperature
 ```
 
 ## Requirements and dependencies
@@ -349,12 +404,13 @@ A stock Omarchy 4. Nothing to install.
 The plugin shells out only to `bash`, `jq`, coreutils, and Omarchy's own
 commands — `omarchy-theme-set`, `omarchy-theme-bg-set`, `omarchy-theme-color`,
 `omarchy-theme-switcher`, `omarchy-menu-images`, `omarchy-audio-output-sink`,
-`omarchy-notification-send` — plus `pactl` for the volume fade, all part of a
-base install. It makes no network requests: sunrise and sunset
+`omarchy-notification-send` — plus `pactl` for the volume fade and `hyprctl`
+for the night light, all part of a base install. It makes no network requests: sunrise and sunset
 are arithmetic, not an API call.
 
-It reads `/sys/bus/iio/devices/` for a light sensor, sets the output volume
-when you ask it to, and writes to exactly two places: its own entry in `~/.config/omarchy/shell.json`, and
+It reads `/sys/bus/iio/devices/` for a light sensor, sets the output volume and
+the screen colour temperature when you ask it to, and writes to exactly two
+places: its own entry in `~/.config/omarchy/shell.json`, and
 `~/.local/state/omarchy/settings/auto-theme.json`. It changes the bar's
 `transparent` flag when a theme's remembered preference or an undecodable
 wallpaper calls for it.
