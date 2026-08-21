@@ -50,6 +50,8 @@ would get in the way of if the slots were called "light" and "dark".
 Each slot's theme is still labelled with what it reads as, because that is
 useful to know. It just never constrains the choice.
 
+![The day and night slots, each with its theme and wallpaper](docs/slots.png)
+
 ## One rule
 
 **A theme change lands in the slot that is currently in force.**
@@ -118,6 +120,8 @@ offsets nudge one side without moving the other.
 
 *Fixed hours* takes a from/to pair.
 
+![The sun schedule, with the day drawn as a strip and the boundary and offsets beneath it](docs/schedule-sun.png)
+
 *Light sensor* reads the ambient light sensor and decides from the room rather
 than the clock — useful under heavy blinds, or in a basement where the sun has
 no say. See below.
@@ -178,6 +182,8 @@ If sensor mode is selected but no threshold has been set, or the sensor
 disappears, the schedule falls back to the sun or fixed hours rather than
 freezing: an unconfigured preference should not take the desktop down with it.
 
+![The light sensor, with a live reading and calibration](docs/schedule-sensor.png)
+
 ## Warming the screen after dark
 
 Omarchy has a night light toggle: on or off, 4000 K or 6500 K, with nothing in
@@ -232,9 +238,13 @@ sunset has not come yet and the marker is still in the neutral stretch. The
 strip makes that obvious instead of leaving it to be guessed at, and **Start
 early** is right underneath if you would rather it began sooner.
 
+![The night light section, with the day tinted by the temperature the screen will be](docs/night-light.png)
+
 A line under the panel heading carries the temperature on screen, in a swatch of
 that colour, alongside the night volume, so neither needs its section opened to
 be checked.
+
+![The heading line, carrying the screen temperature and the night volume](docs/indicators.png)
 
 ### Sharing the toggle
 
@@ -268,6 +278,8 @@ morning, and a room that brightens should not get louder.
 The sink is resolved through `omarchy-audio-output-sink`, the same helper the
 volume keys and the audio panel use, so a DSP or combined sink in front of the
 hardware is honoured rather than bypassed.
+
+![The volume section](docs/volume.png)
 
 ## Backgrounds are remembered per theme
 
