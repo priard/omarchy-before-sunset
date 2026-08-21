@@ -5,6 +5,33 @@ Notable changes to Auto Theme.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-08-21
+
+### Fixed
+
+- **Omarchy's night light toggle is registered again.** Switching it on while
+  the plugin was already in auto did nothing at all: a leftover two-state test
+  read "already agrees" and returned before doing anything, and the next tick
+  quietly pulled the screen back. Both directions now register.
+- **Within seconds rather than up to a minute.** The toggle sits on the bar and
+  in the menu; a minute of the panel disagreeing with the screen reads as the
+  plugin being broken. Detection is now three to four seconds.
+
+### Added
+
+- **The day drawn in its own colours.** The night light section shows the whole
+  day as a strip tinted with the temperature the screen will actually be, with a
+  marker for now. It comes from the same function that drives hyprsunset, so the
+  picture cannot drift from what happens. It also answers the question the
+  numbers could not: switching to auto in the afternoon appears to do nothing
+  because the marker is still in the neutral stretch, and the strip shows that
+  at a glance.
+- **A line under the panel heading** carrying the temperature on screen, in a
+  swatch of that colour, and the night volume — both visible without opening
+  either section.
+- Pressing Omarchy's toggle now says so in the panel, with the moment the
+  schedule takes over again.
+
 ## [0.4.0] - 2026-08-21
 
 ### Added

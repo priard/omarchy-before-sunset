@@ -123,6 +123,7 @@ Panel {
   readonly property int nightlightTransitionMinutes: service ? service.nightlightTransitionMinutes : 45
   readonly property int nightlightLeadMinutes: service ? service.nightlightLeadMinutes : 0
   readonly property int nightlightActual: service ? service.nightlightActual : -1
+  readonly property bool nightlightHeld: service ? service.nightlightHeldUntil > 0 : false
 
   function nightlightConfig(changes) {
     return service ? service.nightlightConfig(changes) : ({})
@@ -438,6 +439,112 @@ Panel {
     // encodeURI leaves the separators alone and fixes the spaces, which a theme
     // directory is perfectly entitled to contain.
     return String(path || "") === "" ? "" : "file://" + encodeURI(String(path))
+  }
+
+  // Planckian locus, Tanner Helland's approximation. Close enough that the
+  // strip below reads as the tint the screen actually takes, which is the whole
+  // point of showing it rather than printing a number.
+  function kelvinColor(kelvin) {
+    var t = Math.max(1000, Math.min(20000, kelvin)) / 100
+    var r, g, b
+
+    if (t <= 66) {
+      r = 255
+      g = 99.4708025861 * Math.log(t) - 161.1195681661
+    } else {
+      r = 329.698727446 * Math.pow(t - 60, -0.1332047592)
+      g = 288.1221695283 * Math.pow(t - 60, -0.0755148492)
+    }
+
+    if (t >= 66) b = 255
+    else if (t <= 19) b = 0
+    else b = 138.5177312231 * Math.log(t - 10) - 305.0447927307
+
+    function channel(value) { return Math.max(0, Math.min(255, value)) / 255 }
+    return Qt.rgba(channel(r), channel(g), channel(b), 1)
+  }
+
+  // The whole day as the screen will look through it, drawn from the same
+  // function that drives hyprsunset — so the picture cannot drift from what
+  // actually happens.
+  component NightlightStrip: Column {
+    id: strip
+
+    readonly property int slices: 96
+    readonly property real midnight: {
+      var moment = new Date(root.nowMs > 0 ? root.nowMs : Date.now())
+      return new Date(moment.getFullYear(), moment.getMonth(), moment.getDate()).getTime()
+    }
+
+    function sliceColor(index) {
+      if (!root.service) return Qt.rgba(0, 0, 0, 0)
+      var instant = midnight + ((index + 0.5) * 86400000 / slices)
+      var kelvin = root.service.nightlightTemperatureAt(instant)
+      return kelvin < 0 ? Qt.rgba(0, 0, 0, 0) : root.kelvinColor(kelvin)
+    }
+
+    width: parent.width
+    spacing: Style.space(4)
+
+    Item {
+      width: strip.width
+      height: Style.space(16)
+
+      Row {
+        anchors.fill: parent
+
+        Repeater {
+          model: strip.slices
+
+          Rectangle {
+            required property int index
+            width: strip.width / strip.slices
+            height: parent.height
+            color: strip.sliceColor(index)
+          }
+        }
+      }
+
+      Rectangle {
+        width: Math.max(2, Style.space(2))
+        height: parent.height + Style.space(8)
+        y: -Style.space(4)
+        x: Math.max(0, Math.min(parent.width - width,
+          parent.width * ((root.nowMs - strip.midnight) / 86400000) - width / 2))
+        radius: width / 2
+        color: root.fg
+      }
+    }
+
+    Item {
+      width: strip.width
+      height: midnightLabel.height
+
+      Text {
+        id: midnightLabel
+        anchors.left: parent.left
+        text: "00:00"
+        color: root.dim
+        font.family: root.face
+        font.pixelSize: Style.font.caption
+      }
+
+      Text {
+        anchors.horizontalCenter: parent.horizontalCenter
+        text: "12:00"
+        color: root.dim
+        font.family: root.face
+        font.pixelSize: Style.font.caption
+      }
+
+      Text {
+        anchors.right: parent.right
+        text: "24:00"
+        color: root.dim
+        font.family: root.face
+        font.pixelSize: Style.font.caption
+      }
+    }
   }
 
   // The day laid out end to end: night, the lit stretch, night again, with a
@@ -860,6 +967,58 @@ Panel {
             }
           }
 
+          // What the schedule is doing to the screen and the speakers right now,
+          // where you can see it without opening either section.
+          Row {
+            visible: root.nightlightEnabled || root.nightVolume >= 0
+            width: parent.width
+            spacing: Style.space(14)
+
+            Row {
+              visible: root.nightlightEnabled
+              spacing: Style.space(6)
+
+              Rectangle {
+                width: Style.space(10)
+                height: width
+                radius: width / 2
+                anchors.verticalCenter: parent.verticalCenter
+                color: root.nightlightActual > 0 ? root.kelvinColor(root.nightlightActual) : "transparent"
+                border.width: 1
+                border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.3)
+              }
+
+              Text {
+                text: root.nightlightHeld ? root.nightlightActual + " K held"
+                  : (root.nightlightActual > 0 ? root.nightlightActual + " K" : "night light")
+                color: root.dim
+                font.family: root.face
+                font.pixelSize: Style.font.caption
+              }
+            }
+
+            Row {
+              visible: root.nightVolume >= 0
+              spacing: Style.space(6)
+
+              Text {
+                // Above the basic plane, so a four-digit \u escape would take
+                // only half of it and print the remainder as a digit.
+                text: String.fromCodePoint(0xf0580)
+                color: root.dim
+                font.family: root.face
+                font.pixelSize: Style.font.caption
+              }
+
+              Text {
+                text: root.nightVolume + "% at night"
+                color: root.dim
+                font.family: root.face
+                font.pixelSize: Style.font.caption
+              }
+            }
+          }
+
           PanelSeparator { foreground: root.fg }
 
           // ------------------------------------------------------- mode
@@ -1195,6 +1354,8 @@ Panel {
               width: parent.width
               text: {
                 var now = root.nightlightActual > 0 ? "Screen is at " + root.nightlightActual + " K. " : ""
+                if (root.nightlightHeld)
+                  return now + "Held where you put it until the day next turns over."
                 if (root.nightlightMode === "off")
                   return now + "Omarchy's own toggle is left to behave exactly as it always has."
                 if (root.nightlightMode === "on")
@@ -1205,6 +1366,11 @@ Panel {
               font.family: root.face
               font.pixelSize: Style.font.caption
               wrapMode: Text.WordWrap
+            }
+
+            NightlightStrip {
+              visible: root.nightlightMode === "auto" && root.autoMode !== "sensor"
+              width: parent.width
             }
 
             Row {

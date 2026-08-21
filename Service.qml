@@ -184,6 +184,9 @@ Item {
   // this plugin strikes with a manual choice.
   property real nightlightHoldUntil: 0
 
+  // Re-evaluated on the tick, so the panel can show the hold and see it end.
+  property real nightlightHeldUntil: 0
+
   // When the current side began, for the cases the schedule cannot date:
   // a pinned mode and the light sensor have no transition instant to speak of.
   property real sideChangedAt: 0
@@ -201,42 +204,66 @@ Item {
     return Math.round(from + (to - from) * easeProgress(progress))
   }
 
-  // -1 means "leave the screen alone".
-  function nightlightTarget() {
+  // The temperature the schedule calls for at an arbitrary instant. Pure, so the
+  // panel can walk it across a whole day to draw the curve, and so the value on
+  // screen and the value in the picture can never disagree.
+  //
+  // Returns -1 where the schedule has no opinion.
+  function nightlightTemperatureAt(instant) {
     if (nightlightMode === "off") return -1
     if (nightlightMode === "on") return nightlightNight
-    if (autoSide === "") return -1
 
-    var now = Date.now()
+    // The sensor has no timetable, so there is no curve to place an arbitrary
+    // instant on. Only the here and now is answerable.
+    var schedule = autoSource === "sensor" ? autoSchedule : scheduleAt(instant)
+    if (!schedule) return -1
+
+    var side = String(schedule.mode)
+    var since = schedule.since ? schedule.since : sideChangedAt
+    var next = schedule.next ? schedule.next : 0
+
     var lead = nightlightLeadMinutes * 60000
     var ramp = nightlightTransitionMinutes * 60000
     var span = lead + ramp
 
-    var settled = autoSide === "night" ? nightlightNight : nightlightDay
-    var previous = autoSide === "night" ? nightlightDay : nightlightNight
+    var settled = side === "night" ? nightlightNight : nightlightDay
+    var previous = side === "night" ? nightlightDay : nightlightNight
 
-    // Running up to the next turn, with a lead configured: start moving toward
-    // the temperature that turn will bring.
-    if (lead > 0 && autoNext > 0 && autoNext - now <= lead) {
-      nightlightRamping = true
-      return mixKelvin(settled, previous, (lead - (autoNext - now)) / span)
-    }
+    // Approaching the next turn with a lead configured: already moving toward
+    // what that turn will bring.
+    if (lead > 0 && next > 0 && next - instant <= lead && instant <= next)
+      return mixKelvin(settled, previous, (lead - (next - instant)) / span)
 
-    var since = autoSince > 0 ? autoSince : sideChangedAt
-    if (since > 0 && now - since < ramp) {
-      nightlightRamping = true
-      return mixKelvin(previous, settled, (lead + (now - since)) / span)
-    }
+    // Just past a turn: still arriving at this half's temperature.
+    if (since > 0 && instant >= since && instant - since < ramp)
+      return mixKelvin(previous, settled, (lead + (instant - since)) / span)
 
-    nightlightRamping = false
     return settled
+  }
+
+  // -1 means "leave the screen alone".
+  function nightlightTarget() {
+    var value = nightlightTemperatureAt(Date.now())
+    if (value < 0) {
+      nightlightRamping = false
+      return -1
+    }
+
+    var settled = autoSide === "night" ? nightlightNight : nightlightDay
+    nightlightRamping = nightlightMode === "auto" && Math.abs(value - settled) >= 8
+    return value
   }
 
   function applyNightlight() {
     if (nightlightHoldUntil > 0) {
-      if (Date.now() < nightlightHoldUntil) return
+      if (Date.now() < nightlightHoldUntil) {
+        nightlightHeldUntil = nightlightHoldUntil
+        return
+      }
       nightlightHoldUntil = 0
     }
+
+    nightlightHeldUntil = 0
 
     var target = nightlightTarget()
     if (target < 0) return
@@ -274,6 +301,9 @@ Item {
 
         root.nightlightActual = Number(reading.temperature)
         root.reconcileNightlight()
+        // Keeps the hold state and the target moving at the probe's rhythm
+        // rather than the minute tick's, so the panel never lags the screen.
+        Qt.callLater(root.applyNightlight)
       }
     }
   }
@@ -316,19 +346,22 @@ Item {
       return
     }
 
-    var turnedOff = nightlightActual === nightlightToggleOff
-    if (turnedOff === (nightlightMode === "off")) {
-      // Already agrees with us; just re-baseline.
-      nightlightPushed = nightlightActual
+    nightlightPushed = nightlightActual
+
+    if (nightlightActual === nightlightToggleOff) {
+      // "Off, now." Nothing to hold: not driving is the whole request.
+      nightlightHoldUntil = 0
+      if (nightlightMode !== "off") persist({ nightlight: nightlightConfig({ mode: "off" }) })
       return
     }
 
-    nightlightPushed = nightlightActual
-    // Hold what they just chose until the next transition. Turning it off also
-    // stops us driving at all, so the hold only really matters when it was
-    // turned on at a time the schedule would have wanted it neutral.
+    // "Warm, now." Which is a statement about this minute, not about the
+    // schedule — pressing it at noon means warm at noon. So the schedule stands
+    // aside until the day next turns over, and only then takes the wheel back.
+    // Without the hold the next tick would drag the screen back to whatever the
+    // hour called for, and the toggle would look broken while we were in auto.
     nightlightHoldUntil = autoNext > 0 ? autoNext : Date.now() + 43200000
-    persist({ nightlight: nightlightConfig({ mode: turnedOff ? "off" : "auto" }) })
+    if (nightlightMode === "off") persist({ nightlight: nightlightConfig({ mode: "auto" }) })
   }
 
   function nightlightConfig(changes) {
@@ -354,6 +387,18 @@ Item {
     repeat: true
     running: root.nightlightEnabled && root.nightlightRamping
     onTriggered: root.applyNightlight()
+  }
+
+  // The night light toggle lives on the bar and in the menu, and pressing it
+  // should register here in a moment, not on the next minute boundary. A
+  // hyprctl query is cheap enough to ask this often; a minute of the panel
+  // disagreeing with the screen is not.
+  Timer {
+    interval: 5000
+    repeat: true
+    running: true
+    triggeredOnStart: true
+    onTriggered: root.probeNightlight()
   }
 
   // --------------------------------------------------------- night volume
@@ -647,6 +692,23 @@ Item {
   readonly property string autoSide: autoSchedule ? String(autoSchedule.mode) : ""
   readonly property real autoNext: autoSchedule && autoSchedule.next ? autoSchedule.next : 0
   readonly property real autoSince: autoSchedule && autoSchedule.since ? autoSchedule.since : 0
+
+  // The clock-driven schedule for any instant, which is what lets the panel draw
+  // a whole day of it. Pure: no properties written, nothing cached.
+  function scheduleAt(instant) {
+    var when = new Date(instant)
+
+    if (configAutoMode !== "fixed" && hasLocation) {
+      var sun = Sun.sunSchedule(when, latitude, longitude, {
+        twilight: twilight,
+        sunriseOffsetMinutes: sunriseOffsetMinutes,
+        sunsetOffsetMinutes: sunsetOffsetMinutes
+      })
+      if (sun) return sun
+    }
+
+    return Sun.fixedSchedule(when, fixedDay, fixedNight)
+  }
 
   function computeAutoSchedule() {
     var now = new Date()
@@ -1286,8 +1348,8 @@ Item {
           target: root.nightlightTarget(),
           actual: root.nightlightActual,
           ramping: root.nightlightRamping,
-          heldUntil: root.nightlightHoldUntil > 0 && Date.now() < root.nightlightHoldUntil
-            ? new Date(root.nightlightHoldUntil).toISOString() : null
+          heldUntil: root.nightlightHeldUntil > 0
+            ? new Date(root.nightlightHeldUntil).toISOString() : null
         },
         volume: {
           night: root.nightVolume,
