@@ -9,14 +9,14 @@
 # picked. When a background is remembered for the theme, this resolves it up
 # front, applies the theme without touching the background, and restores it.
 #
-# Usage: auto-theme-apply <theme-slug> [background-filename]
+# Usage: before-sunset-apply <theme-slug> [background-filename]
 
 set -uo pipefail
 
 theme=${1:-}
 wanted=${2:-}
 
-[[ -n $theme ]] || { echo "usage: auto-theme-apply <theme-slug> [background-filename]" >&2; exit 1; }
+[[ -n $theme ]] || { echo "usage: before-sunset-apply <theme-slug> [background-filename]" >&2; exit 1; }
 
 # The stable homes for a theme's backgrounds. Deliberately not
 # ~/.local/state/omarchy/current/theme/backgrounds, which is a staging

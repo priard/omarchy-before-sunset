@@ -3,7 +3,7 @@ import Quickshell.Io
 import qs.Ui
 import qs.Commons
 
-// Bar button plus the settings popup for Auto Theme.
+// Bar button plus the settings popup for Before Sunset.
 //
 // Every setting lives in shell.json and is read back by the service, so the
 // panel, the CLI and a hand-edited config can never disagree. The panel writes
@@ -11,8 +11,8 @@ import qs.Commons
 // copy of the state it edits.
 Panel {
   id: root
-  moduleName: "priard.auto-theme"
-  ipcTarget: "priard.auto-theme"
+  moduleName: "priard.before-sunset"
+  ipcTarget: "priard.before-sunset"
 
   // Resolved rather than bound: the service is created by the shell's service
   // loader, which may finish after the bar has already built its widgets.
@@ -266,7 +266,7 @@ Panel {
 
   function persist(changes) {
     if (!bar || !bar.shell || typeof bar.shell.updateEntryInline !== "function") {
-      console.warn("auto-theme: no shell to persist through")
+      console.warn("before-sunset: no shell to persist through")
       return
     }
 
@@ -335,7 +335,7 @@ Panel {
   function pickTheme(slot, current) {
     if (pickerProcess.running) return
     pickingSlot = slot
-    pickerProcess.command = [pluginFile("bin/auto-theme-pick"), canonical(current)]
+    pickerProcess.command = [pluginFile("bin/before-sunset-pick"), canonical(current)]
     close()
     pickerProcess.running = true
   }
@@ -364,7 +364,7 @@ Panel {
   function pickBackground(slug, currentName) {
     if (slug === "" || backgroundPicker.running) return
     pickingBackgroundFor = slug
-    backgroundPicker.command = [pluginFile("bin/auto-theme-bg-pick"), canonical(slug), String(currentName || "")]
+    backgroundPicker.command = [pluginFile("bin/before-sunset-bg-pick"), canonical(slug), String(currentName || "")]
     close()
     backgroundPicker.running = true
   }
@@ -731,7 +731,7 @@ Panel {
       }
 
       refreshPending = false
-      infoProcess.command = [root.pluginFile("bin/auto-theme-slot"), slug]
+      infoProcess.command = [root.pluginFile("bin/before-sunset-slot"), slug]
       infoProcess.running = true
     }
 
@@ -955,7 +955,7 @@ Panel {
 
           PanelHero {
             width: parent.width
-            title: "Auto Theme"
+            title: "Before Sunset"
             meta: root.heroMeta
             foreground: root.fg
             fontFamily: root.face

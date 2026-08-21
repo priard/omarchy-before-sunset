@@ -1,9 +1,30 @@
 # Changelog
 
-Notable changes to Auto Theme.
+Notable changes to Before Sunset.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.6.0] - 2026-08-21
+
+### Changed
+
+- **Renamed to Before Sunset.** "Auto Theme" said what it did in the flattest
+  possible way, and said it in a catalogue that already has a Darky and a Dusk.
+
+  The rename is complete rather than cosmetic, so it moves things that were
+  addressable from outside:
+
+  | | was | is |
+  |---|---|---|
+  | plugin id | `priard.auto-theme` | `priard.before-sunset` |
+  | CLI | `omarchy-shell auto-theme …` | `omarchy-shell before-sunset …` |
+  | repository | `omarchy-auto-theme` | `omarchy-before-sunset` |
+  | remembered state | `settings/auto-theme.json` | `settings/before-sunset.json` |
+
+  An existing install needs its id updated in `~/.config/omarchy/shell.json`,
+  and the state file renamed if the remembered wallpapers and bar transparency
+  are worth keeping.
 
 ## [0.5.1] - 2026-08-21
 
@@ -207,4 +228,4 @@ First working version.
   first so it comes back by itself.
 - Seeding on first run from the theme already on screen, so the plugin works
   immediately without changing the desktop out from under you.
-- Bar widget, settings panel, and an `omarchy-shell auto-theme` CLI.
+- Bar widget, settings panel, and an `omarchy-shell before-sunset` CLI.

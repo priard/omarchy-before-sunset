@@ -1,22 +1,22 @@
 {
   "schemaVersion": 1,
-  "id": "priard.auto-theme",
-  "name": "Auto Theme",
-  "version": "0.5.1",
+  "id": "priard.before-sunset",
+  "name": "Before Sunset",
+  "version": "0.6.0",
   "author": "priard",
   "license": "MIT",
   "description": "Switch themes with the sun: one theme for the day half, another for the night half.",
-  "repository": "https://github.com/priard/omarchy-auto-theme",
+  "repository": "https://github.com/priard/omarchy-before-sunset",
   "kinds": [
     "service",
     "bar-widget"
   ],
   "entryPoints": {
     "service": "Service.qml",
-    "barWidget": "AutoThemePanel.qml"
+    "barWidget": "BeforeSunsetPanel.qml"
   },
   "barWidget": {
-    "displayName": "Auto Theme",
+    "displayName": "Before Sunset",
     "description": "Day/night theme schedule, with per-theme backgrounds and bar transparency.",
     "category": "Appearance",
     "allowMultiple": false,

@@ -11,7 +11,7 @@
 # command would flash the on-screen display dozens of times for something the
 # user did not press a key to do.
 #
-# Usage: auto-theme-volume <target-percent> [fade-seconds] [down|up]
+# Usage: before-sunset-volume <target-percent> [fade-seconds] [down|up]
 #
 #   down  act only if the volume is above the target (the night case: quieter,
 #         never louder, so a deliberately hushed machine is left alone)
@@ -24,7 +24,7 @@ target=${1:-}
 fade=${2:-20}
 direction=${3:-both}
 
-[[ $target =~ ^[0-9]+$ ]] || { echo "usage: auto-theme-volume <target-percent> [fade-seconds] [down|up|both]" >&2; exit 1; }
+[[ $target =~ ^[0-9]+$ ]] || { echo "usage: before-sunset-volume <target-percent> [fade-seconds] [down|up|both]" >&2; exit 1; }
 ((target <= 100)) || target=100
 [[ $fade =~ ^[0-9]+$ ]] || fade=20
 
@@ -51,7 +51,7 @@ esac
 
 # One fade at a time. A day transition landing on top of a night fade should
 # replace it, not race it.
-lock="${XDG_RUNTIME_DIR:-/tmp}/auto-theme-volume.pid"
+lock="${XDG_RUNTIME_DIR:-/tmp}/before-sunset-volume.pid"
 if [[ -r $lock ]]; then
   previous=$(cat "$lock" 2>/dev/null)
   [[ $previous =~ ^[0-9]+$ ]] && kill "$previous" 2>/dev/null

@@ -9,7 +9,7 @@
 #
 # Nothing is applied. The caller decides what to do with the answer.
 #
-# Usage: auto-theme-bg-pick <theme-slug> [current-filename]
+# Usage: before-sunset-bg-pick <theme-slug> [current-filename]
 
 set -uo pipefail
 

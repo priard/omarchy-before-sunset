@@ -13,7 +13,7 @@
 # Nothing here applies a theme. The picker only reports a choice; whoever called
 # this decides what to do with it.
 #
-# Usage: auto-theme-pick [theme-slug-to-preselect]
+# Usage: before-sunset-pick [theme-slug-to-preselect]
 
 set -uo pipefail
 

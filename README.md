@@ -1,10 +1,10 @@
-# Auto Theme
+# Before Sunset
 
 Follow the sun: one Omarchy theme through the day, another through the night,
 each with its own wallpaper and its own answer to whether the top bar should be
 transparent.
 
-![The Auto Theme panel](preview.png)
+![The Before Sunset panel](preview.png)
 
 ## Why this exists
 
@@ -61,14 +61,14 @@ until you change it, which is the honest version of an override.
 ## Installation
 
 ```bash
-omarchy plugin add https://github.com/priard/omarchy-auto-theme --enable
+omarchy plugin add https://github.com/priard/omarchy-before-sunset --enable
 ```
 
 Then put the widget on the bar from the bar settings, or add it to
 `~/.config/omarchy/shell.json` by hand:
 
 ```json
-{ "id": "priard.auto-theme" }
+{ "id": "priard.before-sunset" }
 ```
 
 The plugin seeds itself on first run: the theme already on screen takes the
@@ -79,13 +79,13 @@ from under you.
 ## Removal
 
 ```bash
-omarchy plugin remove priard.auto-theme
+omarchy plugin remove priard.before-sunset
 ```
 
 That leaves two things behind, both safe to delete:
 
 ```bash
-rm ~/.local/state/omarchy/settings/auto-theme.json   # remembered backgrounds and transparency
+rm ~/.local/state/omarchy/settings/before-sunset.json   # remembered backgrounds and transparency
 ```
 
 and the plugin's entry in `~/.config/omarchy/shell.json`, if you added one by
@@ -328,7 +328,7 @@ the same precedence the shell's own `updateEntryInline` uses.
 
 ```json
 {
-  "id": "priard.auto-theme",
+  "id": "priard.before-sunset",
   "dayTheme": "catppuccin-latte",
   "nightTheme": "matte-black",
   "mode": "auto",
@@ -356,17 +356,17 @@ the same precedence the shell's own `updateEntryInline` uses.
 Theme names accept either form: `"matte-black"` or `"Matte Black"`.
 
 Remembered backgrounds and transparency live outside this entry, in
-`~/.local/state/omarchy/settings/auto-theme.json`: they are state the plugin
+`~/.local/state/omarchy/settings/before-sunset.json`: they are state the plugin
 observes, not configuration you would hand-write.
 
 ## CLI
 
 ```bash
-omarchy-shell auto-theme status    # JSON: mode, slots, transitions, location, remembered state
-omarchy-shell auto-theme toggle    # pin the other half, or hand control back to the schedule
-omarchy-shell auto-theme day       # pin the day slot
-omarchy-shell auto-theme night     # pin the night slot
-omarchy-shell auto-theme auto      # follow the schedule again
+omarchy-shell before-sunset status    # JSON: mode, slots, transitions, location, remembered state
+omarchy-shell before-sunset toggle    # pin the other half, or hand control back to the schedule
+omarchy-shell before-sunset day       # pin the day slot
+omarchy-shell before-sunset night     # pin the night slot
+omarchy-shell before-sunset auto      # follow the schedule again
 ```
 
 Bind the toggle to a key in `~/.config/hypr/bindings.lua` if you want it on the
@@ -401,17 +401,17 @@ restricts what you can put where.
 ```
 manifest.json          plugin metadata
 Service.qml            the schedule, adoption, and remembered state
-AutoThemePanel.qml     bar icon and settings panel
+BeforeSunsetPanel.qml     bar icon and settings panel
 Sun.js                 sunrise/sunset, pure functions, no dependencies
-bin/auto-theme-apply   switch a theme, restoring its remembered background
-bin/auto-theme-pick    open the theme picker with a given theme preselected
-bin/auto-theme-themes  list installed themes and which side each reads as
-bin/auto-theme-bg-state  the current wallpaper, and whether Qt can decode it
-bin/auto-theme-bg-pick   pick a wallpaper from any theme's backgrounds
-bin/auto-theme-slot      resolve a slot's preview and wallpaper for the panel
-bin/auto-theme-sensor    read the ambient light sensor, if there is one
-bin/auto-theme-volume    ease the output volume to a level over a few seconds
-bin/auto-theme-nightlight  read or set the screen colour temperature
+bin/before-sunset-apply   switch a theme, restoring its remembered background
+bin/before-sunset-pick    open the theme picker with a given theme preselected
+bin/before-sunset-themes  list installed themes and which side each reads as
+bin/before-sunset-bg-state  the current wallpaper, and whether Qt can decode it
+bin/before-sunset-bg-pick   pick a wallpaper from any theme's backgrounds
+bin/before-sunset-slot      resolve a slot's preview and wallpaper for the panel
+bin/before-sunset-sensor    read the ambient light sensor, if there is one
+bin/before-sunset-volume    ease the output volume to a level over a few seconds
+bin/before-sunset-nightlight  read or set the screen colour temperature
 ```
 
 ## Requirements and dependencies
@@ -428,7 +428,7 @@ are arithmetic, not an API call.
 It reads `/sys/bus/iio/devices/` for a light sensor, sets the output volume and
 the screen colour temperature when you ask it to, and writes to exactly two
 places: its own entry in `~/.config/omarchy/shell.json`, and
-`~/.local/state/omarchy/settings/auto-theme.json`. It changes the bar's
+`~/.local/state/omarchy/settings/before-sunset.json`. It changes the bar's
 `transparent` flag when a theme's remembered preference or an undecodable
 wallpaper calls for it.
 

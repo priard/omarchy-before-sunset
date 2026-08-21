@@ -10,8 +10,8 @@
 # ramp needs to name its own.
 #
 # Usage:
-#   auto-theme-nightlight              print {"running","temperature"}
-#   auto-theme-nightlight <kelvin>     set the temperature
+#   before-sunset-nightlight              print {"running","temperature"}
+#   before-sunset-nightlight <kelvin>     set the temperature
 
 set -uo pipefail
 
@@ -34,7 +34,7 @@ if [[ -z $wanted ]]; then
   exit 0
 fi
 
-[[ $wanted =~ ^[0-9]+$ ]] || { echo "usage: auto-theme-nightlight [kelvin]" >&2; exit 1; }
+[[ $wanted =~ ^[0-9]+$ ]] || { echo "usage: before-sunset-nightlight [kelvin]" >&2; exit 1; }
 # hyprsunset's own accepted range. Clamping beats hyprctl rejecting the call and
 # leaving the screen at whatever it happened to be.
 ((wanted >= 1000)) || wanted=1000

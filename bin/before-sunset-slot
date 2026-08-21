@@ -8,7 +8,7 @@
 # question — which of several directories holds the file — and QML has no
 # graceful way to ask it.
 #
-# Usage: auto-theme-slot <theme-slug>
+# Usage: before-sunset-slot <theme-slug>
 # Output: {"slug","name","mode","preview","background","backgroundName"}
 
 set -uo pipefail
@@ -19,7 +19,7 @@ slug=${1:-}
 USER_THEMES="$HOME/.config/omarchy/themes"
 STOCK_THEMES="${OMARCHY_PATH:-/usr/share/omarchy}/themes"
 USER_BACKGROUNDS="$HOME/.config/omarchy/backgrounds/$slug"
-STATE="$HOME/.local/state/omarchy/settings/auto-theme.json"
+STATE="$HOME/.local/state/omarchy/settings/before-sunset.json"
 
 theme_dirs=("$USER_THEMES/$slug" "$STOCK_THEMES/$slug")
 background_dirs=("$USER_BACKGROUNDS" "$USER_THEMES/$slug/backgrounds" "$STOCK_THEMES/$slug/backgrounds")

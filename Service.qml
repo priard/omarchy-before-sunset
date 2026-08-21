@@ -20,7 +20,7 @@ Item {
   property var shell: null
   property var manifest: null
 
-  readonly property string pluginId: "priard.auto-theme"
+  readonly property string pluginId: "priard.before-sunset"
   readonly property string home: Quickshell.env("HOME")
   readonly property string stateDir: home + "/.local/state/omarchy"
   readonly property string themeNamePath: stateDir + "/current/theme.name"
@@ -29,7 +29,7 @@ Item {
   // Written by omarchy-weather-location, and shared with the weather widget so
   // a location only ever has to be set once.
   readonly property string locationPath: stateDir + "/settings/weather.json"
-  readonly property string memoryPath: stateDir + "/settings/auto-theme.json"
+  readonly property string memoryPath: stateDir + "/settings/before-sunset.json"
 
   function pluginFile(name) {
     var url = String(Qt.resolvedUrl(name))
@@ -279,7 +279,7 @@ Item {
 
     nightlightPushed = nightlightDay
     nightlightExternalCandidate = -1
-    nightlightApply.command = [pluginFile("bin/auto-theme-nightlight"), String(nightlightDay)]
+    nightlightApply.command = [pluginFile("bin/before-sunset-nightlight"), String(nightlightDay)]
     nightlightApply.running = true
   }
 
@@ -303,7 +303,7 @@ Item {
 
     nightlightPushed = target
     nightlightExternalCandidate = -1
-    nightlightApply.command = [pluginFile("bin/auto-theme-nightlight"), String(target)]
+    nightlightApply.command = [pluginFile("bin/before-sunset-nightlight"), String(target)]
     nightlightApply.running = true
   }
 
@@ -317,7 +317,7 @@ Item {
 
   Process {
     id: nightlightProbe
-    command: [root.pluginFile("bin/auto-theme-nightlight")]
+    command: [root.pluginFile("bin/before-sunset-nightlight")]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
@@ -505,7 +505,7 @@ Item {
     // Detached rather than held in a Process: the fade outlives the call by
     // design, and the script serialises overlapping runs through its own lock.
     Quickshell.execDetached([
-      pluginFile("bin/auto-theme-volume"),
+      pluginFile("bin/before-sunset-volume"),
       String(target),
       String(volumeFadeSeconds),
       newSide === "night" ? "down" : "up"
@@ -521,7 +521,7 @@ Item {
 
   // Raw sensor counts, not lux: meaningless until calibrated against a
   // particular machine's sensor, so zero means "not set up yet" rather than
-  // "pitch dark". See bin/auto-theme-sensor.
+  // "pitch dark". See bin/before-sunset-sensor.
   readonly property real sensorThreshold: {
     var value = sensorSettings ? parseFloat(sensorSettings.threshold) : NaN
     return isNaN(value) || value <= 0 ? 0 : value
@@ -609,7 +609,7 @@ Item {
 
   Process {
     id: sensorProbe
-    command: [root.pluginFile("bin/auto-theme-sensor")]
+    command: [root.pluginFile("bin/before-sunset-sensor")]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
@@ -910,7 +910,7 @@ Item {
 
   function persist(changes) {
     if (!shell || typeof shell.updateEntryInline !== "function") {
-      console.warn("auto-theme: no shell to persist through")
+      console.warn("before-sunset: no shell to persist through")
       return
     }
 
@@ -934,7 +934,7 @@ Item {
     }
 
     pendingTheme = slug
-    themeProcess.command = [pluginFile("bin/auto-theme-apply"), slug, rememberedBackground(slug)]
+    themeProcess.command = [pluginFile("bin/before-sunset-apply"), slug, rememberedBackground(slug)]
     themeProcess.running = true
 
     if (notifyOnChange) notify(side === "day" ? "Day theme" : "Night theme", slug)
@@ -1066,7 +1066,7 @@ Item {
   Process {
     id: backgroundProbe
     onExited: if (root.backgroundProbePending) Qt.callLater(root.probeBackground)
-    command: [root.pluginFile("bin/auto-theme-bg-state")]
+    command: [root.pluginFile("bin/before-sunset-bg-state")]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
@@ -1291,7 +1291,7 @@ Item {
 
   Process {
     id: themesProcess
-    command: [root.pluginFile("bin/auto-theme-themes")]
+    command: [root.pluginFile("bin/before-sunset-themes")]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
@@ -1302,7 +1302,7 @@ Item {
             Qt.callLater(root.evaluate)
           }
         } catch (e) {
-          console.warn("auto-theme: could not parse theme list:", e)
+          console.warn("before-sunset: could not parse theme list:", e)
         }
       }
     }
@@ -1359,7 +1359,7 @@ Item {
   // ------------------------------------------------------------------ IPC
 
   IpcHandler {
-    target: "auto-theme"
+    target: "before-sunset"
 
     function status(): string {
       return JSON.stringify({
