@@ -104,7 +104,7 @@ Item {
   // Which schedule "auto" follows.
   readonly property string configAutoMode: {
     var value = String(setting("autoMode", "")).toLowerCase()
-    if (value === "sun" || value === "fixed") return value
+    if (value === "sun" || value === "fixed" || value === "sensor") return value
     if (String(setting("mode", "")).toLowerCase() === "fixed") return "fixed"
     return "sun"
   }
@@ -124,6 +124,124 @@ Item {
   readonly property string fixedNight: String((fixedTimes && (fixedTimes.night || fixedTimes.dark)) || "19:00")
 
   readonly property bool notifyOnChange: setting("notify", false) === true
+
+  // ------------------------------------------------------- light sensor
+
+  readonly property var sensorSettings: setting("sensor", ({}))
+
+  // Raw sensor counts, not lux: meaningless until calibrated against a
+  // particular machine's sensor, so zero means "not set up yet" rather than
+  // "pitch dark". See bin/auto-theme-sensor.
+  readonly property real sensorThreshold: {
+    var value = sensorSettings ? parseFloat(sensorSettings.threshold) : NaN
+    return isNaN(value) || value <= 0 ? 0 : value
+  }
+
+  // Fraction either side of the threshold where the sensor is not allowed an
+  // opinion. Without it a reading hovering on the line flips the desktop back
+  // and forth all evening.
+  readonly property real sensorHysteresis: {
+    var value = sensorSettings ? parseFloat(sensorSettings.hysteresis) : NaN
+    return isNaN(value) || value < 0 ? 0.15 : value
+  }
+
+  // How long a changed reading has to hold before it counts. A hand passing
+  // over the sensor is not dusk.
+  readonly property int sensorDwellSeconds: {
+    var value = sensorSettings ? parseFloat(sensorSettings.dwellSeconds) : NaN
+    return isNaN(value) || value < 0 ? 45 : Math.round(value)
+  }
+
+  property bool sensorAvailable: false
+  property real sensorValue: 0
+  property bool sensorRead: false
+
+  // The side the sensor has committed to, and the one it is currently arguing
+  // for but has not held long enough.
+  property string sensorSide: ""
+  property string sensorCandidate: ""
+  property real sensorCandidateSince: 0
+
+  readonly property bool sensorConfigured: sensorAvailable && sensorThreshold > 0
+  readonly property bool sensorUsable: sensorConfigured && sensorSide !== ""
+
+  function probeSensor() {
+    if (!sensorProbe.running) sensorProbe.running = true
+  }
+
+  function applySensorReading() {
+    if (!sensorConfigured) return
+
+    var high = sensorThreshold * (1 + sensorHysteresis)
+    var low = sensorThreshold * (1 - sensorHysteresis)
+    var candidate = sensorValue >= high ? "day" : (sensorValue <= low ? "night" : "")
+
+    // Inside the band the sensor has no opinion and whatever is running stays,
+    // which is the entire point of the band.
+    if (candidate === "") {
+      sensorCandidate = ""
+      return
+    }
+
+    // The first reading commits at once: there is nothing to flap away from
+    // yet, and waiting would leave the desktop undecided for no reason.
+    if (sensorSide === "") {
+      sensorSide = candidate
+      sensorCandidate = ""
+      return
+    }
+
+    if (candidate === sensorSide) {
+      sensorCandidate = ""
+      return
+    }
+
+    if (candidate !== sensorCandidate) {
+      sensorCandidate = candidate
+      sensorCandidateSince = Date.now()
+      return
+    }
+
+    if (Date.now() - sensorCandidateSince >= sensorDwellSeconds * 1000) {
+      sensorSide = candidate
+      sensorCandidate = ""
+    }
+  }
+
+  Process {
+    id: sensorProbe
+    command: [root.pluginFile("bin/auto-theme-sensor")]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var reading
+        try {
+          reading = JSON.parse(String(text || "{}"))
+        } catch (e) {
+          return
+        }
+
+        root.sensorAvailable = reading.available === true
+        if (root.sensorAvailable && reading.value !== null) {
+          root.sensorValue = Number(reading.value)
+          root.sensorRead = true
+          root.applySensorReading()
+        }
+      }
+    }
+  }
+
+  // Faster than the minute tick the schedule runs on: light changes on a scale
+  // of seconds, and the dwell timer is what stops that becoming twitchy.
+  Timer {
+    interval: 10000
+    repeat: true
+    running: root.configMode === "auto" && root.configAutoMode === "sensor"
+    triggeredOnStart: true
+    onTriggered: root.probeSensor()
+  }
+
+  onSensorSideChanged: Qt.callLater(evaluate)
 
   // ------------------------------------------------------------- location
 
@@ -207,6 +325,14 @@ Item {
       return { mode: configMode, since: null, next: null }
     }
 
+    if (configAutoMode === "sensor" && sensorUsable) {
+      scheduleSource = "sensor"
+      return { mode: sensorSide, since: null, next: null }
+    }
+
+    // Sensor mode asked for but not usable — no sensor, or no threshold set
+    // yet. Fall through rather than freeze: an unconfigured preference should
+    // not take the desktop down with it.
     if (configAutoMode !== "fixed" && hasLocation) {
       var sun = Sun.sunSchedule(now, latitude, longitude, {
         twilight: twilight,
@@ -741,7 +867,9 @@ Item {
     onTriggered: root.evaluate()
   }
 
-  Component.onCompleted: loadThemes()
+  // Probed once at startup even when the sensor is not in use, so the panel can
+  // offer the option only on machines that actually have one.
+  Component.onCompleted: { loadThemes(); probeSensor() }
 
   onSettingsChanged: Qt.callLater(evaluate)
   onStoredLocationChanged: Qt.callLater(evaluate)
@@ -773,7 +901,16 @@ Item {
         backgrounds: root.backgroundMemory,
         transparency: root.transparencyMemory,
         barTransparent: root.barTransparent,
-        wallpaperRenderable: root.wallpaperRenderable
+        wallpaperRenderable: root.wallpaperRenderable,
+        sensor: {
+          available: root.sensorAvailable,
+          value: root.sensorRead ? root.sensorValue : null,
+          threshold: root.sensorThreshold,
+          hysteresis: root.sensorHysteresis,
+          dwellSeconds: root.sensorDwellSeconds,
+          side: root.sensorSide,
+          pending: root.sensorCandidate
+        }
       })
     }
 

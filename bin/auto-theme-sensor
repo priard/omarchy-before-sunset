@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# Report the ambient light level, if this machine can measure one.
+#
+# Read straight from the IIO sysfs interface rather than through
+# iio-sensor-proxy: the value is a single file, the proxy is not installed
+# everywhere, and going through D-Bus would add a dependency for something a
+# `cat` already answers.
+#
+# Readings are raw sensor counts scaled by the driver's own scale and offset.
+# They are NOT calibrated lux and differ wildly between machines, so a
+# threshold means nothing until it is set against a particular sensor. The
+# caller is expected to calibrate from live readings rather than ship a number.
+#
+# Output: {"available":bool,"value":number|null,"devices":[{"path","value"}]}
+
+set -uo pipefail
+
+devices=()
+values=()
+
+read_channel() {
+  local dir=$1 raw scale offset file
+
+  # in_illuminance_input is already scaled; in_illuminance_raw needs the
+  # driver's scale and offset applied. Some drivers number the channel.
+  for file in in_illuminance_input in_illuminance_raw in_illuminance0_input in_illuminance0_raw; do
+    [[ -r $dir/$file ]] || continue
+    raw=$(cat "$dir/$file" 2>/dev/null) || continue
+    [[ $raw =~ ^-?[0-9]+([.][0-9]+)?$ ]] || continue
+
+    if [[ $file == *_input ]]; then
+      printf '%s\n' "$raw"
+      return 0
+    fi
+
+    scale=$(cat "$dir/in_illuminance_scale" 2>/dev/null || echo 1)
+    offset=$(cat "$dir/in_illuminance_offset" 2>/dev/null || echo 0)
+    [[ $scale =~ ^-?[0-9]+([.][0-9]+)?$ ]] || scale=1
+    [[ $offset =~ ^-?[0-9]+([.][0-9]+)?$ ]] || offset=0
+
+    awk -v r="$raw" -v s="$scale" -v o="$offset" 'BEGIN { printf "%.0f\n", (r + o) * s }'
+    return 0
+  done
+
+  return 1
+}
+
+for dir in /sys/bus/iio/devices/iio:device*; do
+  [[ -d $dir ]] || continue
+  value=$(read_channel "$dir") || continue
+  devices+=("$dir")
+  values+=("$value")
+done
+
+if ((${#values[@]} == 0)); then
+  jq -n '{available: false, value: null, devices: []}'
+  exit 0
+fi
+
+# Several sensors is normal on a laptop — one per screen corner, say. They
+# disagree by design, so the mean is a steadier signal than any one of them.
+average=$(printf '%s\n' "${values[@]}" | awk '{ total += $1; n++ } END { printf "%.0f\n", total / n }')
+
+per_device=$(
+  for i in "${!devices[@]}"; do
+    jq -nc --arg path "${devices[$i]}" --argjson value "${values[$i]}" '{$path, $value}'
+  done | jq -sc '.'
+)
+
+jq -n --argjson value "$average" --argjson devices "$per_device" \
+  '{available: true, $value, $devices}'

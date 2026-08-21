@@ -23,7 +23,8 @@ is all this plugin is.
 ## What it does
 
 - Switches themes at sunrise and sunset, computed locally from your
-  coordinates — or at fixed clock times if you prefer.
+  coordinates — or at fixed clock times, or from an ambient light sensor if the
+  machine has one.
 - Remembers a background per theme and restores it, so an automatic switch
   never discards the wallpaper you chose.
 - Remembers whether the top bar should be transparent per theme, because a
@@ -99,10 +100,22 @@ and pins back to Auto from there.
 **MODE** — `Day` and `Night` pin one slot and stop the schedule. `Auto`
 follows it.
 
-**SCHEDULE** (Auto only) — `Sunrise to sunset`, or `Fixed hours` with a
-from/to pair. The sunrise option only appears once a location is known;
-without one there is nothing to compute, so the panel says so and offers fixed
-hours alone.
+**SCHEDULE** (Auto only) — how the half of the day gets decided. Options that
+cannot work are not offered: `Sun` needs coordinates, `Light sensor` needs
+hardware. A button that quietly does something else is worse than a button that
+is not there.
+
+*Sun* draws the day as a strip — night, the lit stretch, night again, with a
+marker for now — and puts the boundary and offset controls under it, so those
+settings show their result instead of describing it. `Boundary` chooses where
+the day ends: the visible horizon, or one of the three twilights. The two
+offsets nudge one side without moving the other.
+
+*Fixed hours* takes a from/to pair.
+
+*Light sensor* reads the ambient light sensor and decides from the room rather
+than the clock — useful under heavy blinds, or in a basement where the sun has
+no say. See below.
 
 **THEMES** — one card per slot, showing the two pictures that actually decide
 how that half of the day looks: the theme's own preview and the exact wallpaper
@@ -129,6 +142,36 @@ omarchy-weather-location --set "Warsaw" 52.22977,21.01178
 
 Changing it there changes the schedule here. Setting `latitude` and
 `longitude` in this plugin's own settings overrides it.
+
+## Light sensor
+
+Machines with an ambient light sensor expose it through the kernel's IIO
+interface, one file per reading. The plugin reads it directly rather than
+through `iio-sensor-proxy`, which is not installed everywhere and would be a
+dependency for something `cat` already answers. Where no sensor exists the
+option simply does not appear.
+
+Readings are raw sensor counts scaled by the driver, **not calibrated lux**.
+They differ by orders of magnitude between machines, so no default threshold
+could mean anything. The panel therefore shows the live reading and a
+**Set from now** button: put the room in the state you want to be the boundary,
+press it, and the current reading becomes the threshold.
+
+Two things keep the room from redecorating your desktop every time someone
+walks past:
+
+- **Hysteresis** — a band either side of the threshold where the sensor is
+  given no opinion, so a reading sitting on the line does not oscillate.
+  15% by default.
+- **Hold for** — how long a changed reading has to persist before it counts.
+  A hand passing over the sensor is not dusk. 45 seconds by default.
+
+The first reading of a session commits immediately; there is nothing to flap
+away from yet, and waiting would leave the desktop undecided for no reason.
+
+If sensor mode is selected but no threshold has been set, or the sensor
+disappears, the schedule falls back to the sun or fixed hours rather than
+freezing: an unconfigured preference should not take the desktop down with it.
 
 ## Backgrounds are remembered per theme
 
@@ -208,13 +251,14 @@ the same precedence the shell's own `updateEntryInline` uses.
 | `dayTheme` | seeded | Theme for the day half. |
 | `nightTheme` | seeded | Theme for the night half. |
 | `mode` | `"auto"` | `auto` follows a schedule, `day` / `night` pin one slot, `off` parks the plugin without unloading it. |
-| `autoMode` | `"sun"` | Which schedule `auto` follows: `sun` or `fixed`. |
+| `autoMode` | `"sun"` | Which schedule `auto` follows: `sun`, `fixed`, or `sensor`. |
 | `twilight` | `"official"` | Where the boundary sits: `official` (the visible horizon, i.e. sunrise and sunset), `civil` (~30 min later in the evening, earlier in the morning), `nautical`, `astronomical`, or a zenith angle in degrees. |
 | `sunriseOffsetMinutes` | `0` | Shifts the morning switch. Negative is earlier. |
 | `sunsetOffsetMinutes` | `0` | Shifts the evening switch. Negative is earlier. |
 | `fixed` | `{"day":"07:00","night":"19:00"}` | Clock times for `autoMode: "fixed"`, and the fallback during polar day or polar night. |
 | `latitude` / `longitude` | — | Override the shared weather location for this plugin only. |
 | `notify` | `false` | Send a desktop notification on each switch and each adoption. |
+| `sensor` | — | `{"threshold": 0, "hysteresis": 0.15, "dwellSeconds": 45}` for `autoMode: "sensor"`. A threshold of `0` means not calibrated yet. |
 
 Theme names accept either form: `"matte-black"` or `"Matte Black"`.
 
@@ -272,6 +316,7 @@ bin/auto-theme-themes  list installed themes and which side each reads as
 bin/auto-theme-bg-state  the current wallpaper, and whether Qt can decode it
 bin/auto-theme-bg-pick   pick a wallpaper from any theme's backgrounds
 bin/auto-theme-slot      resolve a slot's preview and wallpaper for the panel
+bin/auto-theme-sensor    read the ambient light sensor, if there is one
 ```
 
 ## Requirements and dependencies
@@ -284,8 +329,9 @@ commands — `omarchy-theme-set`, `omarchy-theme-bg-set`, `omarchy-theme-color`,
 all part of a base install. It makes no network requests: sunrise and sunset
 are arithmetic, not an API call.
 
-It writes to exactly two places: its own entry in `~/.config/omarchy/shell.json`,
-and `~/.local/state/omarchy/settings/auto-theme.json`. It changes the bar's
+It reads `/sys/bus/iio/devices/` for a light sensor and writes to exactly two
+places: its own entry in `~/.config/omarchy/shell.json`, and
+`~/.local/state/omarchy/settings/auto-theme.json`. It changes the bar's
 `transparent` flag when a theme's remembered preference or an undecodable
 wallpaper calls for it.
 

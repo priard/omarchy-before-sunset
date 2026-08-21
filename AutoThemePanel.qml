@@ -38,16 +38,72 @@ Panel {
   readonly property string fixedNight: service ? String(service.fixedNight) : "19:00"
   readonly property bool wallpaperRenderable: service ? service.wallpaperRenderable === true : true
 
-  // Without coordinates there is no sunrise to follow, so the schedule is fixed
-  // times whatever the config says. The service falls back the same way.
-  readonly property string effectiveAutoMode: hasLocation ? autoMode : "fixed"
+  readonly property string twilight: service ? String(service.twilight) : "official"
+  readonly property int sunriseOffsetMinutes: service ? service.sunriseOffsetMinutes : 0
+  readonly property int sunsetOffsetMinutes: service ? service.sunsetOffsetMinutes : 0
+
+  readonly property bool sensorAvailable: service ? service.sensorAvailable === true : false
+  readonly property bool sensorRead: service ? service.sensorRead === true : false
+  readonly property real sensorValue: service ? service.sensorValue : 0
+  readonly property real sensorThreshold: service ? service.sensorThreshold : 0
+  readonly property int sensorDwellSeconds: service ? service.sensorDwellSeconds : 45
+  readonly property string sensorPending: service ? String(service.sensorCandidate) : ""
+
+  // A chosen schedule that cannot run falls back rather than freezing the
+  // desktop, and the panel shows what is actually in force. The service
+  // resolves it the same way.
+  readonly property string effectiveAutoMode: {
+    if (autoMode === "sensor" && sensorAvailable) return "sensor"
+    if (autoMode !== "fixed" && hasLocation) return "sun"
+    return "fixed"
+  }
+
+  readonly property var scheduleOptions: {
+    var options = []
+    if (hasLocation) options.push({ value: "sun", label: "Sun" })
+    options.push({ value: "fixed", label: "Fixed hours" })
+    if (sensorAvailable) options.push({ value: "sensor", label: "Light sensor" })
+    return options
+  }
+
+  // updateEntryInline replaces the whole entry, and the sensor block is a
+  // nested object, so a change to one key has to carry the others.
+  function sensorConfig(changes) {
+    var current = service && service.sensorSettings ? service.sensorSettings : ({})
+    var next = ({
+      threshold: Math.round(sensorThreshold),
+      hysteresis: service ? service.sensorHysteresis : 0.15,
+      dwellSeconds: sensorDwellSeconds
+    })
+    for (var key in current) if (next[key] === undefined) next[key] = current[key]
+    for (var change in changes) next[change] = changes[change]
+    return next
+  }
+
+  readonly property string sensorExplanation: {
+    if (!sensorRead) return "Waiting for the first reading."
+    if (sensorThreshold <= 0)
+      return "No threshold set, so the sun or fixed hours are running instead. "
+        + "Cover the sensor until it reads dark, then press Set from now."
+    if (sensorPending !== "")
+      return "Reading suggests " + sensorPending + "; holding until it stays there."
+    var side = service ? String(service.sensorSide) : ""
+    if (side === "") return "Undecided — the reading sits inside the neutral band."
+    return "Above " + Math.round(sensorThreshold) + " is day, below is night. Currently " + side + "."
+  }
+
+  // Redrawn every half minute while the panel is open: the timeline's "now"
+  // marker is the only thing here that moves on its own.
+  property real nowMs: 0
 
   // Weather Icons' clear-day and clear-night, the same pair the Omarchy weather
   // widget already renders, so the bar font is known to cover them. Written as
   // escapes rather than literal glyphs: private-use characters do not survive
   // every editor and transport, and one that gets eaten leaves a blank button
   // with nothing to indicate what went wrong.
-  readonly property string barIcon: side === "day" ? "" : ""
+  readonly property string sunGlyph: "\ue30d"
+  readonly property string moonGlyph: "\ue32b"
+  readonly property string barIcon: side === "day" ? sunGlyph : moonGlyph
 
   readonly property color fg: bar ? bar.foreground : Color.foreground
   readonly property color dim: Qt.darker(fg, 1.4)
@@ -242,6 +298,25 @@ Panel {
     onTriggered: root.resolveService()
   }
 
+  Timer {
+    interval: 30000
+    repeat: true
+    running: root.opened
+    triggeredOnStart: true
+    onTriggered: root.nowMs = Date.now()
+  }
+
+  // While the panel is open the reading is on screen, so it is polled faster
+  // than the service needs for switching. Only while open: no reason to read a
+  // sensor nobody is looking at.
+  Timer {
+    interval: 3000
+    repeat: true
+    running: root.opened && root.sensorAvailable
+    triggeredOnStart: true
+    onTriggered: if (root.service) root.service.probeSensor()
+  }
+
   BarIconButton {
     id: button
     anchors.fill: parent
@@ -265,6 +340,80 @@ Panel {
     // encodeURI leaves the separators alone and fixes the spaces, which a theme
     // directory is perfectly entitled to contain.
     return String(path || "") === "" ? "" : "file://" + encodeURI(String(path))
+  }
+
+  // The day laid out end to end: night, the lit stretch, night again, with a
+  // marker for now. Drawn from the effective switch points, so the boundary and
+  // offset settings show their result instead of describing it.
+  component DayTimeline: Column {
+    id: timeline
+
+    required property real dayStart
+    required property real dayEnd
+
+    readonly property bool valid: dayStart > 0 && dayEnd > 0 && dayEnd > dayStart
+
+    function dayFraction(instant) {
+      if (!instant) return 0
+      var moment = new Date(instant)
+      var midnight = new Date(moment.getFullYear(), moment.getMonth(), moment.getDate()).getTime()
+      return Math.max(0, Math.min(1, (instant - midnight) / 86400000))
+    }
+
+    visible: valid
+    spacing: Style.space(4)
+
+    Item {
+      width: timeline.width
+      height: Style.space(12)
+
+      Rectangle {
+        anchors.fill: parent
+        radius: height / 2
+        color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.12)
+      }
+
+      Rectangle {
+        x: parent.width * timeline.dayFraction(timeline.dayStart)
+        width: Math.max(2, parent.width
+          * (timeline.dayFraction(timeline.dayEnd) - timeline.dayFraction(timeline.dayStart)))
+        height: parent.height
+        radius: height / 2
+        color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.34)
+      }
+
+      Rectangle {
+        width: Math.max(2, Style.space(2))
+        height: parent.height + Style.space(8)
+        y: -Style.space(4)
+        x: Math.max(0, Math.min(parent.width - width,
+          parent.width * timeline.dayFraction(root.nowMs) - width / 2))
+        radius: width / 2
+        color: root.fg
+      }
+    }
+
+    Item {
+      width: timeline.width
+      height: startLabel.height
+
+      Text {
+        id: startLabel
+        anchors.left: parent.left
+        text: root.sunGlyph + "  " + root.clockOf(timeline.dayStart)
+        color: root.dim
+        font.family: root.face
+        font.pixelSize: Style.font.caption
+      }
+
+      Text {
+        anchors.right: parent.right
+        text: root.clockOf(timeline.dayEnd) + "  " + root.moonGlyph
+        color: root.dim
+        font.family: root.face
+        font.pixelSize: Style.font.caption
+      }
+    }
   }
 
   // A clickable picture with a caption underneath. Themes are not required to
@@ -556,16 +705,13 @@ Panel {
             fontFamily: root.face
           }
 
-          // Offering "Sunrise to sunset" without coordinates would be a button
-          // that quietly does something else, so it is simply not there until
-          // there is a location to compute it from.
+          // Options that cannot work are not offered: sunrise needs
+          // coordinates, the sensor needs hardware. A button that quietly does
+          // something else is worse than a button that is not there.
           ButtonGroup {
-            visible: root.hasLocation
+            visible: root.hasLocation || root.sensorAvailable
             width: parent.width
-            options: [
-              { value: "sun", label: "Sunrise to sunset" },
-              { value: "fixed", label: "Fixed hours" }
-            ]
+            options: root.scheduleOptions
             value: root.effectiveAutoMode
             foreground: root.fg
             fontFamily: root.face
@@ -573,26 +719,85 @@ Panel {
           }
 
           Text {
-            visible: root.hasLocation && root.effectiveAutoMode === "sun"
+            visible: !root.hasLocation
             width: parent.width
-            text: root.sunLine
+            text: "Sunrise and sunset need a location. Set one in the Weather widget, "
+              + "or run:\nomarchy-weather-location --set \"City\" lat,lon"
             color: root.dim
             font.family: root.face
             font.pixelSize: Style.font.caption
             wrapMode: Text.WordWrap
           }
 
-          Text {
-            visible: !root.hasLocation
+          // ------------------------------------------------ sun
+
+          Column {
+            visible: root.effectiveAutoMode === "sun" && root.hasLocation
             width: parent.width
-            text: "Sunrise and sunset need a location. Set one in the Weather widget, "
-              + "or run:\nomarchy-weather-location --set \"City\" lat,lon\n"
-              + "Until then, only fixed hours are available."
-            color: root.dim
-            font.family: root.face
-            font.pixelSize: Style.font.caption
-            wrapMode: Text.WordWrap
+            spacing: Style.space(8)
+
+            DayTimeline {
+              width: parent.width
+              dayStart: root.service ? root.service.todaySunrise : 0
+              dayEnd: root.service ? root.service.todaySunset : 0
+            }
+
+            Text {
+              width: parent.width
+              text: root.locationName
+              color: root.dim
+              font.family: root.face
+              font.pixelSize: Style.font.caption
+              elide: Text.ElideRight
+            }
+
+            Dropdown {
+              width: parent.width
+              label: "Boundary"
+              options: [
+                { value: "official", label: "Horizon (sunrise/sunset)" },
+                { value: "civil", label: "Civil twilight" },
+                { value: "nautical", label: "Nautical twilight" },
+                { value: "astronomical", label: "Astronomical twilight" }
+              ]
+              value: root.twilight
+              foreground: root.fg
+              fontFamily: root.face
+              onChanged: function(value) { root.persist({ twilight: value }) }
+            }
+
+            // Nudge one side without moving the other. The timeline above
+            // redraws as these change, so the effect is visible rather than
+            // guessed at.
+            Row {
+              width: parent.width
+              spacing: Style.space(10)
+
+              NumberField {
+                label: "Sunrise ± min"
+                value: root.sunriseOffsetMinutes
+                from: -180
+                to: 180
+                stepSize: 5
+                foreground: root.fg
+                fontFamily: root.face
+                onModified: function(value) { root.persist({ sunriseOffsetMinutes: value }) }
+              }
+
+              NumberField {
+                label: "Sunset ± min"
+                value: root.sunsetOffsetMinutes
+                from: -180
+                to: 180
+                stepSize: 5
+                foreground: root.fg
+                fontFamily: root.face
+                onModified: function(value) { root.persist({ sunsetOffsetMinutes: value }) }
+              }
+            }
           }
+
+          // ------------------------------------------------ fixed hours
 
           Row {
             visible: root.effectiveAutoMode === "fixed"
@@ -641,9 +846,83 @@ Panel {
               }
             }
           }
+
+          // ------------------------------------------------ light sensor
+
+          Column {
+            visible: root.effectiveAutoMode === "sensor"
+            width: parent.width
+            spacing: Style.space(8)
+
+            Item {
+              width: parent.width
+              height: Math.max(readingLabel.height, calibrate.height)
+
+              Text {
+                id: readingLabel
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.sensorRead ? "Light now: " + root.sensorValue : "Reading…"
+                color: root.dim
+                font.family: root.face
+                font.pixelSize: Style.font.caption
+              }
+
+              // Readings are raw sensor counts, not lux, and differ by orders
+              // of magnitude between machines. Calibrating against what the
+              // sensor says right now is the only threshold that means
+              // anything.
+              Button {
+                id: calibrate
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Set from now"
+                bordered: true
+                enabled: root.sensorRead
+                foreground: root.fg
+                fontFamily: root.face
+                onClicked: root.persist({ sensor: root.sensorConfig({ threshold: Math.round(root.sensorValue) }) })
+              }
+            }
+
+            Row {
+              width: parent.width
+              spacing: Style.space(10)
+
+              NumberField {
+                label: "Threshold"
+                value: Math.round(root.sensorThreshold)
+                from: 0
+                to: 1000000
+                stepSize: 1000
+                foreground: root.fg
+                fontFamily: root.face
+                onModified: function(value) { root.persist({ sensor: root.sensorConfig({ threshold: value }) }) }
+              }
+
+              NumberField {
+                label: "Hold for (s)"
+                value: root.sensorDwellSeconds
+                from: 0
+                to: 600
+                stepSize: 15
+                foreground: root.fg
+                fontFamily: root.face
+                onModified: function(value) { root.persist({ sensor: root.sensorConfig({ dwellSeconds: value }) }) }
+              }
+            }
+
+            Text {
+              width: parent.width
+              text: root.sensorExplanation
+              color: root.dim
+              font.family: root.face
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.WordWrap
+            }
+          }
         }
 
-        PanelSeparator { foreground: root.fg }
 
         // ----------------------------------------------------- themes
 
