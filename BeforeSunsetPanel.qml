@@ -123,6 +123,23 @@ Panel {
   readonly property int nightlightTransitionMinutes: service ? service.nightlightTransitionMinutes : 45
   readonly property int nightlightLeadMinutes: service ? service.nightlightLeadMinutes : 0
   readonly property int nightlightActual: service ? service.nightlightActual : -1
+  readonly property string nightlightSource: service ? String(service.nightlightSource) : "schedule"
+  readonly property string nightlightFixedDay: service ? String(service.nightlightFixedDay) : "07:00"
+  readonly property string nightlightFixedNight: service ? String(service.nightlightFixedNight) : "21:00"
+
+  function setNightlightTime(which, text) {
+    var value = String(text || "").trim()
+    if (!/^([0-9]{1,2}):([0-9]{2})$/.test(value)) return false
+
+    var parts = value.split(":")
+    if (parseInt(parts[0], 10) > 23 || parseInt(parts[1], 10) > 59) return false
+
+    persist({ nightlight: nightlightConfig({ fixed: {
+      day: which === "day" ? value : nightlightFixedDay,
+      night: which === "night" ? value : nightlightFixedNight
+    } }) })
+    return true
+  }
   readonly property bool nightlightHeld: service ? service.nightlightHeldUntil > 0 : false
 
   function nightlightConfig(changes) {
@@ -132,6 +149,8 @@ Panel {
   readonly property string nightlightSummary: {
     if (nightlightMode === "off") return "Off"
     if (nightlightMode === "on") return "Always " + nightlightNight + " K"
+    if (nightlightSource === "fixed")
+      return nightlightNight + " K from " + nightlightFixedNight
     return nightlightNight + " K over " + nightlightTransitionMinutes + " min"
   }
 
@@ -511,7 +530,6 @@ Panel {
         y: -Style.space(4)
         x: Math.max(0, Math.min(parent.width - width,
           parent.width * ((root.nowMs - strip.midnight) / 86400000) - width / 2))
-        radius: width / 2
         color: root.fg
       }
     }
@@ -568,14 +586,16 @@ Panel {
     visible: valid
     spacing: Style.space(4)
 
+    // Same axis and same geometry as the night light strip below it — both run
+    // midnight to midnight, and two bars describing the same day should not
+    // look like they came from different panels.
     Item {
       width: timeline.width
-      height: Style.space(12)
+      height: Style.space(16)
 
       Rectangle {
         anchors.fill: parent
-        radius: height / 2
-        color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.12)
+        color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.10)
       }
 
       Rectangle {
@@ -583,8 +603,7 @@ Panel {
         width: Math.max(2, parent.width
           * (timeline.dayFraction(timeline.dayEnd) - timeline.dayFraction(timeline.dayStart)))
         height: parent.height
-        radius: height / 2
-        color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.34)
+        color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.42)
       }
 
       Rectangle {
@@ -593,7 +612,6 @@ Panel {
         y: -Style.space(4)
         x: Math.max(0, Math.min(parent.width - width,
           parent.width * timeline.dayFraction(root.nowMs) - width / 2))
-        radius: width / 2
         color: root.fg
       }
     }
@@ -1368,8 +1386,70 @@ Panel {
               wrapMode: Text.WordWrap
             }
 
+            ButtonGroup {
+              visible: root.nightlightMode === "auto"
+              width: parent.width
+              options: [
+                { value: "schedule", label: "Follow the schedule" },
+                { value: "fixed", label: "Own hours" }
+              ]
+              value: root.nightlightSource
+              foreground: root.fg
+              fontFamily: root.face
+              onChanged: function(value) { root.persist({ nightlight: root.nightlightConfig({ source: value }) }) }
+            }
+
+            Row {
+              visible: root.nightlightMode === "auto" && root.nightlightSource === "fixed"
+              width: parent.width
+              spacing: Style.space(14)
+
+              Column {
+                spacing: Style.space(6)
+
+                Text {
+                  text: "Neutral from"
+                  color: root.dim
+                  font.family: root.face
+                  font.pixelSize: Style.font.caption
+                }
+
+                TextField {
+                  width: Style.space(90)
+                  text: root.nightlightFixedDay
+                  foreground: root.fg
+                  font.family: root.face
+                  inputMask: "99:99"
+                  onEditingFinished: if (!root.setNightlightTime("day", text)) text = root.nightlightFixedDay
+                }
+              }
+
+              Column {
+                spacing: Style.space(6)
+
+                Text {
+                  text: "Warm from"
+                  color: root.dim
+                  font.family: root.face
+                  font.pixelSize: Style.font.caption
+                }
+
+                TextField {
+                  width: Style.space(90)
+                  text: root.nightlightFixedNight
+                  foreground: root.fg
+                  font.family: root.face
+                  inputMask: "99:99"
+                  onEditingFinished: if (!root.setNightlightTime("night", text)) text = root.nightlightFixedNight
+                }
+              }
+            }
+
             NightlightStrip {
-              visible: root.nightlightMode === "auto" && root.autoMode !== "sensor"
+              // Its own hours give it a timetable even where the schedule has
+              // none, so the sensor no longer rules the picture out.
+              visible: root.nightlightMode === "auto"
+                && (root.nightlightSource === "fixed" || root.autoMode !== "sensor")
               width: parent.width
             }
 

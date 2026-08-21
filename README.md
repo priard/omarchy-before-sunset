@@ -202,6 +202,14 @@ says something about colours on screen, not about whether your eyes want a
 warmer picture at midnight. The schedule is computed either way, so the night
 light — and the night volume — keep working while a theme is pinned.
 
+### Its own hours, if you want them
+
+By default the warming follows the same schedule the themes do. It does not
+have to. **Own hours** gives it a from/to pair of its own, which is useful when
+a theme should turn at sunset but the screen has no business warming until the
+evening proper — and it gives the night light a timetable under the light
+sensor, which has none.
+
 ### Choosing the numbers
 
 Kelvin means little until you have seen it on your own screen, so as a rough
@@ -368,7 +376,7 @@ the same precedence the shell's own `updateEntryInline` uses.
 | `notify` | `false` | Send a desktop notification on each switch and each adoption. |
 | `sensor` | — | `{"threshold": 0, "hysteresis": 0.15, "dwellSeconds": 45, "device": ""}` for `autoMode: "sensor"`. A threshold of `0` means not calibrated yet; an empty `device` averages every sensor found. |
 | `volume` | — | `{"night": 25, "day": null, "fadeSeconds": 20}`. Percentages; `null` leaves that side alone. `0` is a real target, meaning silence. |
-| `nightlight` | — | `{"mode": "off", "day": 6500, "night": 4000, "transitionMinutes": 45, "leadMinutes": 0}`. `mode` is `off`, `auto`, or `on`. |
+| `nightlight` | — | `{"mode": "off", "source": "schedule", "fixed": {"day": "07:00", "night": "21:00"}, "day": 6500, "night": 4000, "transitionMinutes": 45, "leadMinutes": 0}`. `mode` is `off`, `auto` or `on`; `source` is `schedule` or `fixed`. |
 
 Theme names accept either form: `"matte-black"` or `"Matte Black"`.
 

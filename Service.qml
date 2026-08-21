@@ -143,6 +143,19 @@ Item {
 
   readonly property bool nightlightEnabled: nightlightMode !== "off"
 
+  // Whether the warming follows the same schedule the themes do, or keeps its
+  // own hours. They are not always the same wish: a theme can turn at sunset
+  // while the screen has no business warming until the evening proper.
+  readonly property string nightlightSource: {
+    var value = String(nightlightSettings ? (nightlightSettings.source || "") : "").toLowerCase()
+    return value === "fixed" ? "fixed" : "schedule"
+  }
+
+  readonly property var nightlightFixed: nightlightSettings && nightlightSettings.fixed
+    ? nightlightSettings.fixed : ({})
+  readonly property string nightlightFixedDay: String(nightlightFixed.day || "07:00")
+  readonly property string nightlightFixedNight: String(nightlightFixed.night || "21:00")
+
   function nightlightKelvin(key, fallback) {
     var value = nightlightSettings ? parseInt(nightlightSettings[key], 10) : NaN
     if (isNaN(value)) return fallback
@@ -216,9 +229,14 @@ Item {
     if (nightlightMode === "off") return -1
     if (nightlightMode === "on") return nightlightNight
 
-    // The sensor has no timetable, so there is no curve to place an arbitrary
-    // instant on. Only the here and now is answerable.
-    var schedule = autoSource === "sensor" ? autoSchedule : scheduleAt(instant)
+    var schedule
+    if (nightlightSource === "fixed") {
+      schedule = Sun.fixedSchedule(new Date(instant), nightlightFixedDay, nightlightFixedNight)
+    } else {
+      // The sensor has no timetable, so there is no curve to place an arbitrary
+      // instant on. Only the here and now is answerable.
+      schedule = autoSource === "sensor" ? autoSchedule : scheduleAt(instant)
+    }
     if (!schedule) return -1
 
     var side = String(schedule.mode)
@@ -388,6 +406,9 @@ Item {
     // reading is not.
     if (nightlightExternalCandidate !== nightlightActual) {
       nightlightExternalCandidate = nightlightActual
+      // Confirm straight away rather than on the next round. The wait exists to
+      // outlast a stale reading, which takes a moment, not five seconds.
+      nightlightConfirmTimer.restart()
       return
     }
 
@@ -414,6 +435,8 @@ Item {
   function nightlightConfig(changes) {
     var next = ({
       mode: nightlightMode,
+      source: nightlightSource,
+      fixed: { day: nightlightFixedDay, night: nightlightFixedNight },
       day: nightlightDay,
       night: nightlightNight,
       transitionMinutes: nightlightTransitionMinutes,
@@ -441,10 +464,17 @@ Item {
   // hyprctl query is cheap enough to ask this often; a minute of the panel
   // disagreeing with the screen is not.
   Timer {
-    interval: 5000
+    interval: 3000
     repeat: true
     running: true
     triggeredOnStart: true
+    onTriggered: root.probeNightlight()
+  }
+
+  Timer {
+    id: nightlightConfirmTimer
+    interval: 400
+    repeat: false
     onTriggered: root.probeNightlight()
   }
 
@@ -1392,6 +1422,8 @@ Item {
           night: root.nightlightNight,
           transitionMinutes: root.nightlightTransitionMinutes,
           leadMinutes: root.nightlightLeadMinutes,
+          source: root.nightlightSource,
+          fixed: { day: root.nightlightFixedDay, night: root.nightlightFixedNight },
           target: root.nightlightTarget(),
           actual: root.nightlightActual,
           ramping: root.nightlightRamping,

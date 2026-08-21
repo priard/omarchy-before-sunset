@@ -5,6 +5,27 @@ Notable changes to Before Sunset.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-08-21
+
+### Added
+
+- **The night light can keep its own hours.** Following the theme schedule is
+  still the default, but the two are not always the same wish: a theme can turn
+  at sunset while the screen has no business warming until the evening proper.
+  Its own hours also give it a timetable under the light sensor, which has none,
+  so the day strip can be drawn there too.
+
+### Changed
+
+- **The schedule bar matches the night light strip.** Both describe the same
+  midnight-to-midnight axis and sat one above the other looking like they came
+  from different panels — one a rounded pill, the other a flat block. Same
+  height, same corners, same marker now, and more contrast between the halves.
+- **Omarchy's toggle registers in two or three seconds** instead of five to ten.
+  A toggle value still has to survive a second look, but that look now happens
+  immediately rather than on the next round of polling: the wait exists to
+  outlast a stale reading, which takes a moment, not five seconds.
+
 ## [0.6.0] - 2026-08-21
 
 ### Changed
