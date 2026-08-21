@@ -5,6 +5,33 @@ Notable changes to Auto Theme.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-08-21
+
+### Added
+
+- **The volume can ease down at nightfall.** Set a level and the output volume
+  slides to it when the schedule turns the day over — no jump, no on-screen
+  display, just the room getting quieter. An optional counterpart eases it back
+  up at daybreak.
+- Night never raises the volume and day never lowers it, so a machine you
+  deliberately hushed stays hushed.
+- Reaching for the volume mid-fade stops the fade. Someone pressing the volume
+  keys has an opinion about the volume, and it outranks the schedule's.
+- Only the sun and fixed hours move it, and only on their own transitions —
+  never when you pin a half yourself. Under the light sensor a lamp being
+  switched on is not the morning.
+
+### Fixed
+
+- **A wallpaper changed outside the plugin now shows up in the panel.** Two
+  faults, both the same shape. The remembered wallpaper was published to the
+  panel before it was written to the state file the panel reads, so the panel
+  was handed the value being replaced. And both the panel and the service
+  dropped a refresh that arrived while one was already running — which is
+  precisely the request carrying the change that just happened. Requests now
+  queue, the file is written first, and opening the panel re-reads everything
+  regardless.
+
 ## [0.2.1] - 2026-08-21
 
 ### Fixed

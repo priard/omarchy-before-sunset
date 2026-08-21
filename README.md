@@ -173,6 +173,27 @@ If sensor mode is selected but no threshold has been set, or the sensor
 disappears, the schedule falls back to the sun or fixed hours rather than
 freezing: an unconfigured preference should not take the desktop down with it.
 
+## Easing the volume down at night
+
+Give the plugin a level and the output volume slides to it when the schedule
+turns the day over. It is a slide, not a jump, and it shows no on-screen
+display — nobody pressed a key, so nothing should flash.
+
+The rules are deliberately one-directional. Night lowers and never raises; day,
+if you enable it, raises and never lowers. A machine you deliberately hushed
+stays hushed either way. Reach for the volume keys mid-fade and the fade gives
+way, because someone pressing them has an opinion about the volume that
+outranks the schedule's.
+
+Only the sun and fixed hours move it, and only when they turn the day over.
+Pinning a half yourself never does — that is you choosing a theme, not the day
+ending. The light sensor never does either: a lamp switched on is not the
+morning, and a room that brightens should not get louder.
+
+The sink is resolved through `omarchy-audio-output-sink`, the same helper the
+volume keys and the audio panel use, so a DSP or combined sink in front of the
+hardware is honoured rather than bypassed.
+
 ## Backgrounds are remembered per theme
 
 `omarchy theme set` picks a theme's *first* background whenever it enters that
@@ -258,7 +279,8 @@ the same precedence the shell's own `updateEntryInline` uses.
 | `fixed` | `{"day":"07:00","night":"19:00"}` | Clock times for `autoMode: "fixed"`, and the fallback during polar day or polar night. |
 | `latitude` / `longitude` | — | Override the shared weather location for this plugin only. |
 | `notify` | `false` | Send a desktop notification on each switch and each adoption. |
-| `sensor` | — | `{"threshold": 0, "hysteresis": 0.15, "dwellSeconds": 45}` for `autoMode: "sensor"`. A threshold of `0` means not calibrated yet. |
+| `sensor` | — | `{"threshold": 0, "hysteresis": 0.15, "dwellSeconds": 45, "device": ""}` for `autoMode: "sensor"`. A threshold of `0` means not calibrated yet; an empty `device` averages every sensor found. |
+| `volume` | — | `{"night": 25, "day": null, "fadeSeconds": 20}`. Percentages; `null` leaves that side alone. `0` is a real target, meaning silence. |
 
 Theme names accept either form: `"matte-black"` or `"Matte Black"`.
 
@@ -317,6 +339,7 @@ bin/auto-theme-bg-state  the current wallpaper, and whether Qt can decode it
 bin/auto-theme-bg-pick   pick a wallpaper from any theme's backgrounds
 bin/auto-theme-slot      resolve a slot's preview and wallpaper for the panel
 bin/auto-theme-sensor    read the ambient light sensor, if there is one
+bin/auto-theme-volume    ease the output volume to a level over a few seconds
 ```
 
 ## Requirements and dependencies
@@ -325,12 +348,13 @@ A stock Omarchy 4. Nothing to install.
 
 The plugin shells out only to `bash`, `jq`, coreutils, and Omarchy's own
 commands — `omarchy-theme-set`, `omarchy-theme-bg-set`, `omarchy-theme-color`,
-`omarchy-theme-switcher`, `omarchy-menu-images`, `omarchy-notification-send` —
-all part of a base install. It makes no network requests: sunrise and sunset
+`omarchy-theme-switcher`, `omarchy-menu-images`, `omarchy-audio-output-sink`,
+`omarchy-notification-send` — plus `pactl` for the volume fade, all part of a
+base install. It makes no network requests: sunrise and sunset
 are arithmetic, not an API call.
 
-It reads `/sys/bus/iio/devices/` for a light sensor and writes to exactly two
-places: its own entry in `~/.config/omarchy/shell.json`, and
+It reads `/sys/bus/iio/devices/` for a light sensor, sets the output volume
+when you ask it to, and writes to exactly two places: its own entry in `~/.config/omarchy/shell.json`, and
 `~/.local/state/omarchy/settings/auto-theme.json`. It changes the bar's
 `transparent` flag when a theme's remembered preference or an undecodable
 wallpaper calls for it.

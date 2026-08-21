@@ -125,6 +125,73 @@ Item {
 
   readonly property bool notifyOnChange: setting("notify", false) === true
 
+  // --------------------------------------------------------- night volume
+
+  readonly property var volumeSettings: setting("volume", ({}))
+
+  // -1 means "leave the volume alone", which is not the same as 0: silence is a
+  // legitimate target for someone who wants the machine mute after dark.
+  function volumeLevel(key) {
+    var value = volumeSettings ? volumeSettings[key] : undefined
+    if (value === undefined || value === null || value === "") return -1
+
+    var parsed = parseInt(value, 10)
+    return isNaN(parsed) || parsed < 0 || parsed > 100 ? -1 : parsed
+  }
+
+  readonly property int nightVolume: volumeLevel("night")
+  readonly property int dayVolume: volumeLevel("day")
+
+  readonly property int volumeFadeSeconds: {
+    var value = volumeSettings ? parseInt(volumeSettings.fadeSeconds, 10) : NaN
+    return isNaN(value) || value < 0 ? 20 : Math.min(300, value)
+  }
+
+  // The side the clock last put us on. Kept apart from `side` so a restart, a
+  // pin, or a switch between schedules cannot be mistaken for dusk falling.
+  property string lastScheduledSide: ""
+
+  // Only the time-based schedules move the volume. Under the light sensor a
+  // lamp being switched on is not the morning, and nobody wants the room
+  // getting louder because someone opened the blinds.
+  function noteScheduledSide() {
+    if (scheduleSource !== "sun" && scheduleSource !== "fixed") {
+      lastScheduledSide = ""
+      return
+    }
+
+    if (side === "") return
+
+    // First evaluation after a start or a schedule change establishes where we
+    // are; it is not a transition and must not fade anything.
+    if (lastScheduledSide === "") {
+      lastScheduledSide = side
+      return
+    }
+
+    if (side === lastScheduledSide) return
+
+    lastScheduledSide = side
+    fadeVolumeFor(side)
+  }
+
+  function fadeVolumeFor(newSide) {
+    var target = newSide === "night" ? nightVolume : dayVolume
+    if (target < 0) return
+
+    // Detached rather than held in a Process: the fade outlives the call by
+    // design, and the script serialises overlapping runs through its own lock.
+    Quickshell.execDetached([
+      pluginFile("bin/auto-theme-volume"),
+      String(target),
+      String(volumeFadeSeconds),
+      newSide === "night" ? "down" : "up"
+    ])
+
+    if (notifyOnChange)
+      notify(newSide === "night" ? "Quieting down" : "Back up", "Volume easing to " + target + "%")
+  }
+
   // ------------------------------------------------------- light sensor
 
   readonly property var sensorSettings: setting("sensor", ({}))
@@ -400,7 +467,12 @@ Item {
   function evaluate() {
     refreshSunTimes()
     schedule = computeSchedule()
-    if (!schedule) return
+    if (!schedule) {
+      lastScheduledSide = ""
+      return
+    }
+
+    noteScheduledSide()
 
     // theme.name has not been read yet; acting now would fight whatever is on
     // screen without knowing what that is.
@@ -563,11 +635,15 @@ Item {
   // it simply never reaches the screen.
   property bool wallpaperRenderable: true
 
-  function saveMemory() {
+  // Takes the maps explicitly so a caller can persist a value before publishing
+  // it. The panel resolves a slot's wallpaper by reading this file and refreshes
+  // the instant the property changes: assign first and it reads the value that
+  // is being replaced.
+  function saveMemoryAs(backgrounds, transparency) {
     memoryFile.setText(JSON.stringify({
       version: 1,
-      backgrounds: backgroundMemory,
-      transparency: transparencyMemory
+      backgrounds: backgrounds,
+      transparency: transparency
     }, null, 2) + "\n")
   }
 
@@ -584,8 +660,8 @@ Item {
     var next = ({})
     for (var k in backgroundMemory) next[k] = backgroundMemory[k]
     next[key] = filename
+    saveMemoryAs(next, transparencyMemory)
     backgroundMemory = next
-    saveMemory()
   }
 
   // null when the theme has no stored preference, so the current bar setting
@@ -603,8 +679,8 @@ Item {
     var next = ({})
     for (var k in transparencyMemory) next[k] = transparencyMemory[k]
     next[key] = value === true
+    saveMemoryAs(backgroundMemory, next)
     transparencyMemory = next
-    saveMemory()
   }
 
   // A background chosen for a slot: always remembered, and applied right away
@@ -629,6 +705,7 @@ Item {
 
   Process {
     id: backgroundProbe
+    onExited: if (root.backgroundProbePending) Qt.callLater(root.probeBackground)
     command: [root.pluginFile("bin/auto-theme-bg-state")]
     stdout: StdioCollector {
       waitForEnd: true
@@ -729,8 +806,19 @@ Item {
   // broken. Slots that are not running are stored and left alone, as before.
   onTransparencyMemoryChanged: Qt.callLater(applyBarTransparency)
 
+  // A probe request arriving while one is in flight is the one that matters —
+  // it carries the change that just happened. Dropping it leaves the remembered
+  // wallpaper a step behind until something else disturbs the directory.
+  property bool backgroundProbePending: false
+
   function probeBackground() {
-    if (!backgroundProbe.running) backgroundProbe.running = true
+    if (backgroundProbe.running) {
+      backgroundProbePending = true
+      return
+    }
+
+    backgroundProbePending = false
+    backgroundProbe.running = true
   }
 
   FileView {
@@ -936,6 +1024,12 @@ Item {
         transparency: root.transparencyMemory,
         barTransparent: root.barTransparent,
         wallpaperRenderable: root.wallpaperRenderable,
+        volume: {
+          night: root.nightVolume,
+          day: root.dayVolume,
+          fadeSeconds: root.volumeFadeSeconds,
+          lastScheduledSide: root.lastScheduledSide
+        },
         sensor: {
           available: root.sensorAvailable,
           value: root.sensorRead ? root.sensorValue : null,

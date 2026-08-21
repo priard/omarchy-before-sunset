@@ -116,6 +116,29 @@ Panel {
     return ""
   }
 
+  readonly property int nightVolume: service ? service.nightVolume : -1
+  readonly property int dayVolume: service ? service.dayVolume : -1
+  readonly property int volumeFadeSeconds: service ? service.volumeFadeSeconds : 20
+
+  // Same shape as sensorConfig: a nested object, so one changed key has to
+  // carry the rest. null turns a side off; 0 is a real target, meaning silence.
+  function volumeConfig(changes) {
+    var next = ({
+      night: nightVolume < 0 ? null : nightVolume,
+      day: dayVolume < 0 ? null : dayVolume,
+      fadeSeconds: volumeFadeSeconds
+    })
+    for (var change in changes) next[change] = changes[change]
+    return next
+  }
+
+  readonly property string volumeSummary: {
+    if (nightVolume < 0 && dayVolume < 0) return "Off"
+    if (nightVolume >= 0 && dayVolume >= 0) return "Night " + nightVolume + "% · day " + dayVolume + "%"
+    if (nightVolume >= 0) return "Night · " + nightVolume + "%"
+    return "Day · " + dayVolume + "%"
+  }
+
   readonly property string sensorExplanation: {
     if (!sensorRead) return "Waiting for the first reading."
     if (sensorThreshold <= 0)
@@ -323,7 +346,17 @@ Panel {
 
   Component.onCompleted: resolveService()
   onBarChanged: resolveService()
-  onOpenedChanged: if (opened) resolveService()
+  // Opening the panel is the moment its contents have to be true. A signal
+  // missed while it was shut — or a probe that raced — must not survive being
+  // looked at.
+  signal refreshRequested()
+
+  onOpenedChanged: {
+    if (!opened) return
+    resolveService()
+    if (service) service.probeBackground()
+    refreshRequested()
+  }
 
   // The bar can be built before the service loader has finished; a couple of
   // cheap retries beat leaving the widget permanently inert.
@@ -548,8 +581,20 @@ Panel {
     readonly property string backgroundPath: info && info.background ? String(info.background) : ""
     readonly property string backgroundName: info && info.backgroundName ? String(info.backgroundName) : ""
 
+    // A request arriving while one is in flight is the interesting one — it
+    // carries the change that just happened. Dropping it leaves the card a step
+    // behind for good, so it waits its turn instead.
+    property bool refreshPending: false
+
     function refresh() {
-      if (slug === "" || infoProcess.running) return
+      if (slug === "") return
+
+      if (infoProcess.running) {
+        refreshPending = true
+        return
+      }
+
+      refreshPending = false
       infoProcess.command = [root.pluginFile("bin/auto-theme-slot"), slug]
       infoProcess.running = true
     }
@@ -566,6 +611,7 @@ Panel {
           }
         }
       }
+      onExited: if (card.refreshPending) Qt.callLater(card.refresh)
     }
 
     // The wallpaper can change without the theme changing, so the card follows
@@ -574,6 +620,11 @@ Panel {
       target: root.service
       enabled: root.service !== null
       function onBackgroundMemoryChanged() { card.refresh() }
+    }
+
+    Connections {
+      target: root
+      function onRefreshRequested() { card.refresh() }
     }
 
     onSlugChanged: refresh()
@@ -1087,6 +1138,115 @@ Panel {
                 font.pixelSize: Style.font.caption
                 wrapMode: Text.WordWrap
               }
+            }
+          }
+
+          PanelSeparator { foreground: root.fg }
+
+          // ---------------------------------------------------- volume
+
+          Disclosure {
+            title: "VOLUME"
+            summary: root.volumeSummary
+
+            Item {
+              width: parent.width
+              height: Math.max(nightLabel.height, nightSwitch.height)
+
+              Text {
+                id: nightLabel
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Ease down at nightfall"
+                color: root.dim
+                font.family: root.face
+                font.pixelSize: Style.font.caption
+              }
+
+              ToggleSwitch {
+                id: nightSwitch
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                checked: root.nightVolume >= 0
+                foreground: root.fg
+                onToggled: root.persist({ volume: root.volumeConfig({ night: root.nightVolume >= 0 ? null : 30 }) })
+              }
+            }
+
+            Row {
+              visible: root.nightVolume >= 0
+              width: parent.width
+              spacing: Style.space(12)
+
+              NumberField {
+                label: "Night level %"
+                value: Math.max(0, root.nightVolume)
+                from: 0
+                to: 100
+                stepSize: 5
+                foreground: root.fg
+                fontFamily: root.face
+                onModified: function(value) { root.persist({ volume: root.volumeConfig({ night: value }) }) }
+              }
+
+              NumberField {
+                label: "Fade (s)"
+                value: root.volumeFadeSeconds
+                from: 0
+                to: 300
+                stepSize: 5
+                foreground: root.fg
+                fontFamily: root.face
+                onModified: function(value) { root.persist({ volume: root.volumeConfig({ fadeSeconds: value }) }) }
+              }
+            }
+
+            Item {
+              width: parent.width
+              height: Math.max(dayLabel.height, daySwitch.height)
+
+              Text {
+                id: dayLabel
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Ease back up at daybreak"
+                color: root.dim
+                font.family: root.face
+                font.pixelSize: Style.font.caption
+              }
+
+              ToggleSwitch {
+                id: daySwitch
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                checked: root.dayVolume >= 0
+                foreground: root.fg
+                onToggled: root.persist({ volume: root.volumeConfig({ day: root.dayVolume >= 0 ? null : 60 }) })
+              }
+            }
+
+            NumberField {
+              visible: root.dayVolume >= 0
+              label: "Day level %"
+              value: Math.max(0, root.dayVolume)
+              from: 0
+              to: 100
+              stepSize: 5
+              foreground: root.fg
+              fontFamily: root.face
+              onModified: function(value) { root.persist({ volume: root.volumeConfig({ day: value }) }) }
+            }
+
+            Text {
+              width: parent.width
+              text: "Only the sun and fixed hours move the volume, and only when they turn "
+                + "the day over — not when you pin a half yourself. Night never raises it "
+                + "and day never lowers it, so a machine you deliberately hushed stays "
+                + "hushed. Reach for the volume mid-fade and the fade gives way."
+              color: root.dim
+              font.family: root.face
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.WordWrap
             }
           }
 
