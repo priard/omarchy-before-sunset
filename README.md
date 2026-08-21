@@ -6,6 +6,11 @@ transparent.
 
 ![The Before Sunset panel](preview.png)
 
+The name is a loose nod to Linklater's *Before Sunset*, and to the two films
+either side of it — between them they cover sunrise, sunset and midnight. This
+concerns itself with the same three moments, and with considerably less
+conversation.
+
 ## Why this exists
 
 Warp's terminal lets you nominate a light theme and a dark theme and then
