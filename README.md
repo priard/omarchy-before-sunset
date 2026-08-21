@@ -342,6 +342,10 @@ running service instance keeps its old code and its IPC target, and a mounted
 bar widget keeps its old code too. Run `omarchy restart shell` after editing
 the QML, before concluding anything about behaviour.
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
