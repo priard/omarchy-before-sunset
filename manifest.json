@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.priard.auto-theme",
+  "name": "Auto Theme",
+  "version": "0.1.0",
+  "author": "priard",
+  "license": "MIT",
+  "description": "Switch themes with the sun: one theme for the day half, another for the night half.",
+  "repository": "https://github.com/priard/omarchy-auto-theme",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "AutoThemePanel.qml"
+  },
+  "barWidget": {
+    "displayName": "Auto Theme",
+    "description": "Day/night theme schedule, with per-theme backgrounds and bar transparency.",
+    "category": "Appearance",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

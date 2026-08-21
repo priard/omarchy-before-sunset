@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# Apply a theme, keeping the background the user last chose for it.
+#
+# omarchy-theme-set picks a theme's first background whenever it enters that
+# theme, because the current-background symlink still points into the previous
+# theme's directory and so matches nothing in the new one. Left alone, that
+# means every automatic day/night switch silently discards the wallpaper you
+# picked. When a background is remembered for the theme, this resolves it up
+# front, applies the theme without touching the background, and restores it.
+#
+# Usage: auto-theme-apply <theme-slug> [background-filename]
+
+set -uo pipefail
+
+theme=${1:-}
+wanted=${2:-}
+
+[[ -n $theme ]] || { echo "usage: auto-theme-apply <theme-slug> [background-filename]" >&2; exit 1; }
+
+# The stable homes for a theme's backgrounds. Deliberately not
+# ~/.local/state/omarchy/current/theme/backgrounds, which is a staging
+# directory replaced wholesale on every switch: a path into it is meaningless
+# by the time the next theme lands.
+resolve_background() {
+  local name=$1 dir
+
+  [[ -n $name ]] || return 1
+  # A filename, never a path: anything else is a stale or hand-edited value.
+  [[ $name != */* ]] || return 1
+
+  for dir in \
+    "$HOME/.config/omarchy/backgrounds/$theme" \
+    "$HOME/.config/omarchy/themes/$theme/backgrounds" \
+    "${OMARCHY_PATH:-/usr/share/omarchy}/themes/$theme/backgrounds"; do
+    [[ -f $dir/$name ]] || continue
+    printf '%s\n' "$dir/$name"
+    return 0
+  done
+
+  return 1
+}
+
+if background=$(resolve_background "$wanted"); then
+  OMARCHY_THEME_SKIP_BACKGROUND=1 omarchy-theme-set "$theme" || exit $?
+  omarchy-theme-bg-set "$background"
+else
+  # No remembered background, or the file is gone. Let omarchy pick, which is
+  # also what seeds the memory for next time.
+  omarchy-theme-set "$theme"
+fi

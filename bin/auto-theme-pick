@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# Open Omarchy's theme picker with a given theme preselected, and print the
+# chosen slug.
+#
+# omarchy-theme-switcher would be the natural thing to call, but it derives its
+# preselection from the theme currently on screen. Opening it for the night slot
+# in the middle of the day would arrive with the day theme highlighted, which
+# answers the wrong question: the row that should be selected is the one this
+# slot already holds. The switcher takes no argument to override that, so the
+# picker underneath it is driven directly.
+#
+# Nothing here applies a theme. The picker only reports a choice; whoever called
+# this decides what to do with it.
+#
+# Usage: auto-theme-pick [theme-slug-to-preselect]
+
+set -uo pipefail
+
+preselect=${1:-}
+
+# Maintained by omarchy-theme-switcher, which rebuilds it whenever the set of
+# installed themes changes. Borrowing it avoids a second, subtly different copy
+# of "which themes have a preview and what is it called".
+preview_dir="${XDG_CACHE_HOME:-$HOME/.cache}/omarchy/theme-selector/previews"
+
+# Never built, so there is nothing to preselect against. The switcher itself
+# still works and will populate the cache for next time.
+if [[ ! -d $preview_dir ]] || [[ -z $(ls -A "$preview_dir" 2>/dev/null) ]]; then
+  exec omarchy-theme-switcher
+fi
+
+selected=""
+if [[ -n $preselect ]]; then
+  for extension in png jpg jpeg webp gif bmp; do
+    if [[ -e $preview_dir/$preselect.$extension ]]; then
+      selected="$preview_dir/$preselect.$extension"
+      break
+    fi
+  done
+fi
+
+args=(--print-name --show-labels --filterable --lazy-thumbnails)
+[[ -n $selected ]] && args+=(--selected "$selected")
+
+exec omarchy-menu-images "${args[@]}" "$preview_dir"

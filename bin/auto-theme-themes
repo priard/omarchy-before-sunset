@@ -1,0 +1,89 @@
+#!/bin/bash
+
+# Every installed Omarchy theme as JSON, sorted into light and dark.
+#
+# Themes that ship a colors.toml are resolved by omarchy-theme-color, the same
+# helper every other Omarchy consumer uses, so its precedence (`mode`, legacy
+# `theme_type`, a light.mode marker, then background luminance) is honoured
+# without being reimplemented here.
+#
+# Themes that ship only an alacritty.toml have no colors.toml until the moment
+# they are applied. Those are judged on their own terms, mirroring the
+# resolver's rule rather than inventing a second one.
+#
+# Output: [{"slug","name","mode"}], user themes shadowing stock ones of the
+# same name, the way omarchy-theme-set resolves them.
+
+set -uo pipefail
+
+USER_THEMES="$HOME/.config/omarchy/themes"
+STOCK_THEMES="${OMARCHY_PATH:-/usr/share/omarchy}/themes"
+
+# Omarchy calls a background light when its channels sum past 382. Matching that
+# exactly matters more than picking a better formula: a theme must not land in
+# the light list here and be treated as dark everywhere else.
+luminance_mode() {
+  local hex=${1#\#}
+
+  [[ $hex =~ ^[0-9a-fA-F]{6}$ ]] || return 1
+
+  local sum=$((16#${hex:0:2} + 16#${hex:2:2} + 16#${hex:4:2}))
+  ((sum > 382)) && echo light || echo dark
+}
+
+alacritty_background() {
+  [[ -f $1 ]] || return 1
+
+  sed -nE '/^\[colors\.primary\]/,/^\[/ s/^[[:space:]]*background[[:space:]]*=[[:space:]]*["'\'']?(#[0-9a-fA-F]{6}).*/\1/p' "$1" | head -n1
+}
+
+theme_mode() {
+  local dir=$1 resolved background
+
+  if [[ -f $dir/colors.toml ]]; then
+    resolved=$(omarchy-theme-color --file "$dir/colors.toml" mode 2>/dev/null)
+    if [[ $resolved == light || $resolved == dark ]]; then
+      echo "$resolved"
+      return 0
+    fi
+  fi
+
+  if [[ -f $dir/light.mode ]]; then
+    echo light
+    return 0
+  fi
+
+  background=$(alacritty_background "$dir/alacritty.toml") || return 1
+  luminance_mode "$background"
+}
+
+declare -A MODES=()
+
+scan() {
+  local dir slug mode
+
+  for dir in "$1"/*/; do
+    [[ -d $dir ]] || continue
+
+    slug=$(basename "$dir")
+
+    # An empty or half-removed theme directory has nothing to switch to.
+    # Offering it would just be a way to break your own desktop.
+    mode=$(theme_mode "${dir%/}") || continue
+    [[ -n $mode ]] || continue
+
+    MODES[$slug]=$mode
+  done
+}
+
+scan "$STOCK_THEMES"
+scan "$USER_THEMES"
+
+for slug in "${!MODES[@]}"; do
+  # "tokyo-night" -> "Tokyo Night", matching how omarchy theme list presents them.
+  name=$(tr '-' ' ' <<<"$slug" | sed -E 's/\b(.)/\u\1/g')
+  printf '%s\t%s\t%s\n' "$slug" "$name" "${MODES[$slug]}"
+done | sort | jq -R -s -c '
+  split("\n")
+  | map(select(length > 0) | split("\t") | {slug: .[0], name: .[1], mode: .[2]})
+'

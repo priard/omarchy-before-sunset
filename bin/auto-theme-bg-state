@@ -1,0 +1,76 @@
+#!/bin/bash
+
+# Report the current background: its filename, and whether Qt can paint it.
+#
+# The second half matters because a transparent bar is only transparent to
+# something. Qt renders a few formats itself and gets the rest from imageformat
+# plugins; when the decoder for a wallpaper's format is missing, the desktop
+# paints black while every tool that reads the file sees the real picture and
+# picks colours to contrast with *that*. The bar ends up coloured for an image
+# nobody can see.
+#
+# Judgement is deliberately one-sided. Saying "renderable" when it is not costs
+# an ugly bar until the wallpaper changes; saying "not renderable" when it is
+# would switch off transparency on a perfectly healthy desktop. So every
+# uncertain case — no plugin directory found, an extension this script has
+# never heard of — reports renderable and stays out of the way. Only a format
+# that is known to need a plugin, on a system where the plugin directory was
+# found and the plugin is not in it, is reported as undecodable.
+#
+# Output: {"file": "...", "renderable": true|false}
+
+set -uo pipefail
+
+link="$HOME/.local/state/omarchy/current/background"
+path=$(readlink -f "$link" 2>/dev/null) || exit 0
+[[ -f $path ]] || exit 0
+
+name=$(basename "$path")
+extension=$(tr '[:upper:]' '[:lower:]' <<<"${name##*.}")
+
+report() {
+  jq -n --arg file "$name" --argjson renderable "$1" '{$file, $renderable}'
+  exit 0
+}
+
+# Built into QtGui, no plugin involved.
+case "$extension" in
+png | bmp | ppm | pgm | pbm | xbm | xpm) report true ;;
+esac
+
+# Formats Qt only reads through a plugin. Anything not listed here is left
+# alone: an unknown extension is not evidence of a missing decoder.
+case "$extension" in
+jpg | jpeg) plugin="libqjpeg.so" ;;
+gif) plugin="libqgif.so" ;;
+webp) plugin="libqwebp.so" ;;
+tif | tiff) plugin="libqtiff.so" ;;
+ico | cur) plugin="libqico.so" ;;
+svg | svgz) plugin="libqsvg.so" ;;
+avif) plugin="libqavif.so" ;;
+heif | heic) plugin="libqheif.so" ;;
+jp2 | j2k) plugin="libqjp2.so" ;;
+icns) plugin="libqicns.so" ;;
+tga) plugin="libqtga.so" ;;
+*) report true ;;
+esac
+
+found_plugin_dir=false
+for dir in \
+  ${QT_PLUGIN_PATH:+${QT_PLUGIN_PATH//:/ }} \
+  /usr/lib/qt6/plugins/imageformats \
+  /usr/lib/qt/plugins/imageformats \
+  /usr/lib64/qt6/plugins/imageformats; do
+
+  for candidate in "$dir" "$dir/imageformats"; do
+    [[ -d $candidate ]] || continue
+    found_plugin_dir=true
+    [[ -e $candidate/$plugin ]] && report true
+  done
+done
+
+# A directory was found and the decoder was not in it: that is a real answer.
+# No directory at all means this script does not understand how Qt is laid out
+# here, which is not the wallpaper's fault.
+$found_plugin_dir && report false
+report true
