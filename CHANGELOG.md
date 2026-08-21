@@ -41,6 +41,17 @@ the settings do instead of describing it.
 
 ### Changed
 
+- **The panel is organised by how often you touch things.** The mode and the
+  two slots are always there; the schedule sits behind a heading that
+  summarises itself — `SCHEDULE  Sun · 05:27 – 19:54` — and opens when you want
+  it. Settings you set once no longer claim permanent height, and everything
+  that stayed got more room around it.
+- **The panel scrolls when it does not fit.** Its height is clamped to the
+  screen and the content did not scroll, so on a short display the bottom was
+  simply cut off with no way to reach it. Now it flicks — but only when there
+  is something to reach.
+- The transparency switch rides on its slot's heading row instead of taking a
+  row of its own.
 - Both pickers open with *that slot's* current choice selected rather than
   whatever is on screen. Those differ precisely when you are setting up the
   half of the day that is not running.

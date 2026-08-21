@@ -80,6 +80,24 @@ Panel {
     return next
   }
 
+  // What the collapsed schedule heading says, so the section can stay shut
+  // without hiding which schedule is actually running.
+  readonly property string scheduleSummary: {
+    if (!service) return ""
+
+    if (effectiveAutoMode === "sun")
+      return "Sun · " + clockOf(service.todaySunrise) + " – " + clockOf(service.todaySunset)
+
+    if (effectiveAutoMode === "fixed")
+      return "Fixed · " + fixedDay + " – " + fixedNight
+
+    if (effectiveAutoMode === "sensor")
+      return sensorThreshold > 0 ? "Light sensor · above " + Math.round(sensorThreshold)
+        : "Light sensor · not calibrated"
+
+    return ""
+  }
+
   readonly property string sensorExplanation: {
     if (!sensorRead) return "Waiting for the first reading."
     if (sensorThreshold <= 0)
@@ -486,6 +504,9 @@ Panel {
   // One half of the day: what it looks like, and the two things you can change
   // about it. Both pictures are live — the theme's own preview and the exact
   // wallpaper this slot will restore.
+  // One half of the day: what it looks like, and the three things you can change
+  // about it. The transparency switch rides on the heading row because it fits
+  // there for free — as its own row it cost two lines and said no more.
   component SlotCard: Column {
     id: card
 
@@ -541,72 +562,56 @@ Panel {
     Component.onCompleted: refresh()
 
     width: parent.width
-    spacing: Style.space(6)
-
-    Row {
-      spacing: Style.space(6)
-
-      Text {
-        text: card.label
-        color: root.dim
-        font.family: root.face
-        font.pixelSize: Style.font.caption
-        font.bold: true
-      }
-
-      Text {
-        visible: card.mode !== ""
-        text: "(" + card.mode + ")"
-        color: root.dim
-        font.family: root.face
-        font.pixelSize: Style.font.caption
-      }
-
-      Text {
-        visible: card.inForce
-        text: "\u00b7 now"
-        color: root.dim
-        font.family: root.face
-        font.pixelSize: Style.font.caption
-      }
-    }
-
-    Row {
-      width: parent.width
-      spacing: Style.space(8)
-
-      Thumb {
-        width: (parent.width - Style.space(8)) / 2
-        source: card.previewPath
-        caption: card.slug === "" ? "Choose a theme" : root.displayName(card.slug)
-        fallback: card.slug === "" ? "Choose a theme" : root.displayName(card.slug)
-        onActivated: root.pickTheme(card.slot, card.slug)
-      }
-
-      Thumb {
-        width: (parent.width - Style.space(8)) / 2
-        source: card.backgroundPath
-        caption: card.backgroundName === "" ? "No background" : card.backgroundName
-        fallback: "No background"
-        onActivated: root.pickBackground(card.slug, card.backgroundName)
-      }
-    }
+    spacing: Style.space(8)
 
     Item {
       width: parent.width
-      height: transparencySwitch.height
+      height: Math.max(heading.height, barSwitch.height)
 
-      Text {
+      Row {
+        id: heading
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
-        text: "Transparent bar"
+        spacing: Style.space(6)
+
+        Text {
+          text: card.label
+          color: root.dim
+          font.family: root.face
+          font.pixelSize: Style.font.caption
+          font.bold: true
+        }
+
+        Text {
+          visible: card.mode !== ""
+          text: "(" + card.mode + ")"
+          color: root.dim
+          font.family: root.face
+          font.pixelSize: Style.font.caption
+        }
+
+        Text {
+          visible: card.inForce
+          text: "· now"
+          color: root.dim
+          font.family: root.face
+          font.pixelSize: Style.font.caption
+        }
+      }
+
+      Text {
+        id: barLabel
+        anchors.right: barSwitch.left
+        anchors.rightMargin: Style.space(8)
+        anchors.verticalCenter: parent.verticalCenter
+        text: "transparent bar"
         color: root.dim
         font.family: root.face
         font.pixelSize: Style.font.caption
       }
 
       ToggleSwitch {
-        id: transparencySwitch
+        id: barSwitch
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
         checked: card.transparentBar
@@ -614,6 +619,99 @@ Panel {
         interactive: card.slug !== ""
         onToggled: if (root.service) root.service.rememberTransparency(card.slug, !card.transparentBar)
       }
+    }
+
+    Row {
+      width: parent.width
+      spacing: Style.space(10)
+
+      Thumb {
+        width: (parent.width - Style.space(10)) / 2
+        source: card.previewPath
+        caption: card.slug === "" ? "Choose a theme" : root.displayName(card.slug)
+        fallback: card.slug === "" ? "Choose a theme" : root.displayName(card.slug)
+        onActivated: root.pickTheme(card.slot, card.slug)
+      }
+
+      Thumb {
+        width: (parent.width - Style.space(10)) / 2
+        source: card.backgroundPath
+        caption: card.backgroundName === "" ? "No background" : card.backgroundName
+        fallback: "No background"
+        onActivated: root.pickBackground(card.slug, card.backgroundName)
+      }
+    }
+  }
+
+  // A heading that hides its own section. Settings you touch once do not earn
+  // permanent height, and a panel taller than the screen has no way to show
+  // what it is hiding.
+  component Disclosure: Column {
+    id: disclosure
+
+    required property string title
+    property string summary: ""
+    property bool expanded: false
+
+    default property alias body: holder.children
+
+    width: parent.width
+    spacing: Style.space(12)
+
+    Item {
+      width: parent.width
+      height: Math.max(titleText.height, chevron.height)
+
+      Row {
+        anchors.left: parent.left
+        anchors.right: chevron.left
+        anchors.rightMargin: Style.space(8)
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: Style.space(8)
+
+        Text {
+          id: titleText
+          text: disclosure.title
+          color: root.dim
+          font.family: root.face
+          font.pixelSize: Style.font.caption
+          font.bold: true
+        }
+
+        Text {
+          visible: !disclosure.expanded && disclosure.summary !== ""
+          text: disclosure.summary
+          color: root.dim
+          font.family: root.face
+          font.pixelSize: Style.font.caption
+          elide: Text.ElideRight
+        }
+      }
+
+      Text {
+        id: chevron
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        // Nerd Font chevrons, covered by the bar font. Written as escapes so a
+        // transport that eats private-use characters cannot leave a blank.
+        text: disclosure.expanded ? "\uf078" : "\uf054"
+        color: root.dim
+        font.family: root.face
+        font.pixelSize: Style.font.caption
+      }
+
+      MouseArea {
+        anchors.fill: parent
+        cursorShape: Qt.PointingHandCursor
+        onClicked: disclosure.expanded = !disclosure.expanded
+      }
+    }
+
+    Column {
+      id: holder
+      width: parent.width
+      spacing: Style.space(12)
+      visible: disclosure.expanded
     }
   }
 
@@ -624,7 +722,7 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(340))
+    contentWidth: panel.fittedContentWidth(Style.space(360))
     contentHeight: panel.fittedContentHeight(column.implicitHeight)
 
     PanelKeyCatcher {
@@ -633,329 +731,328 @@ Panel {
       onCloseRequested: root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
 
-      Column {
-        id: column
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        spacing: Style.space(14)
-
-        PanelHero {
-          width: parent.width
-          title: "Auto Theme"
-          meta: root.heroMeta
-          foreground: root.fg
-          fontFamily: root.face
-          iconComponent: Text {
-            text: root.barIcon
-            color: root.fg
-            font.family: root.face
-            font.pixelSize: Style.font.display
-          }
-        }
-
-        PanelSeparator { foreground: root.fg }
-
-        // ------------------------------------------------------- mode
+      // fittedContentHeight clamps the card to the screen, and the content
+      // holder does not scroll: without this, a short display would simply cut
+      // the bottom off with no way to reach it. Interactive only when there is
+      // something to reach, so a panel that fits never flicks under the cursor.
+      Flickable {
+        anchors.fill: parent
+        contentWidth: width
+        contentHeight: column.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: contentHeight > height
 
         Column {
+          id: column
           width: parent.width
-          spacing: Style.space(8)
+          spacing: Style.space(18)
 
-          PanelSectionHeader {
-            text: "MODE"
+          PanelHero {
+            width: parent.width
+            title: "Auto Theme"
+            meta: root.heroMeta
             foreground: root.fg
             fontFamily: root.face
+            iconComponent: Text {
+              text: root.barIcon
+              color: root.fg
+              font.family: root.face
+              font.pixelSize: Style.font.display
+            }
           }
 
-          ButtonGroup {
-            width: parent.width
-            options: [
-              { value: "day", label: "Day" },
-              { value: "night", label: "Night" },
-              { value: "auto", label: "Auto" }
-            ]
-            value: root.configMode === "off" ? "" : root.configMode
-            foreground: root.fg
-            fontFamily: root.face
-            onChanged: function(value) { root.persist({ mode: value }) }
-          }
+          PanelSeparator { foreground: root.fg }
 
-          Text {
-            visible: root.configMode === "day" || root.configMode === "night"
-            width: parent.width
-            text: "Pinned. The schedule is not running; switch to Auto to follow it again."
-            color: root.dim
-            font.family: root.face
-            font.pixelSize: Style.font.caption
-            wrapMode: Text.WordWrap
-          }
-        }
-
-        // --------------------------------------------------- schedule
-
-        Column {
-          width: parent.width
-          spacing: Style.space(8)
-          visible: root.configMode === "auto"
-
-          PanelSectionHeader {
-            text: "SCHEDULE"
-            foreground: root.fg
-            fontFamily: root.face
-          }
-
-          // Options that cannot work are not offered: sunrise needs
-          // coordinates, the sensor needs hardware. A button that quietly does
-          // something else is worse than a button that is not there.
-          ButtonGroup {
-            visible: root.hasLocation || root.sensorAvailable
-            width: parent.width
-            options: root.scheduleOptions
-            value: root.effectiveAutoMode
-            foreground: root.fg
-            fontFamily: root.face
-            onChanged: function(value) { root.persist({ autoMode: value }) }
-          }
-
-          Text {
-            visible: !root.hasLocation
-            width: parent.width
-            text: "Sunrise and sunset need a location. Set one in the Weather widget, "
-              + "or run:\nomarchy-weather-location --set \"City\" lat,lon"
-            color: root.dim
-            font.family: root.face
-            font.pixelSize: Style.font.caption
-            wrapMode: Text.WordWrap
-          }
-
-          // ------------------------------------------------ sun
+          // ------------------------------------------------------- mode
 
           Column {
-            visible: root.effectiveAutoMode === "sun" && root.hasLocation
             width: parent.width
-            spacing: Style.space(8)
+            spacing: Style.space(10)
 
-            DayTimeline {
-              width: parent.width
-              dayStart: root.service ? root.service.todaySunrise : 0
-              dayEnd: root.service ? root.service.todaySunset : 0
-            }
-
-            Text {
-              width: parent.width
-              text: root.locationName
-              color: root.dim
-              font.family: root.face
-              font.pixelSize: Style.font.caption
-              elide: Text.ElideRight
-            }
-
-            Dropdown {
-              width: parent.width
-              label: "Boundary"
-              options: [
-                { value: "official", label: "Horizon (sunrise/sunset)" },
-                { value: "civil", label: "Civil twilight" },
-                { value: "nautical", label: "Nautical twilight" },
-                { value: "astronomical", label: "Astronomical twilight" }
-              ]
-              value: root.twilight
+            PanelSectionHeader {
+              text: "MODE"
               foreground: root.fg
               fontFamily: root.face
-              onChanged: function(value) { root.persist({ twilight: value }) }
             }
 
-            // Nudge one side without moving the other. The timeline above
-            // redraws as these change, so the effect is visible rather than
-            // guessed at.
-            Row {
+            ButtonGroup {
               width: parent.width
-              spacing: Style.space(10)
-
-              NumberField {
-                label: "Sunrise ± min"
-                value: root.sunriseOffsetMinutes
-                from: -180
-                to: 180
-                stepSize: 5
-                foreground: root.fg
-                fontFamily: root.face
-                onModified: function(value) { root.persist({ sunriseOffsetMinutes: value }) }
-              }
-
-              NumberField {
-                label: "Sunset ± min"
-                value: root.sunsetOffsetMinutes
-                from: -180
-                to: 180
-                stepSize: 5
-                foreground: root.fg
-                fontFamily: root.face
-                onModified: function(value) { root.persist({ sunsetOffsetMinutes: value }) }
-              }
-            }
-          }
-
-          // ------------------------------------------------ fixed hours
-
-          Row {
-            visible: root.effectiveAutoMode === "fixed"
-            width: parent.width
-            spacing: Style.space(12)
-
-            Column {
-              spacing: Style.space(4)
-
-              Text {
-                text: "Day from"
-                color: root.dim
-                font.family: root.face
-                font.pixelSize: Style.font.caption
-              }
-
-              TextField {
-                width: Style.space(90)
-                text: root.fixedDay
-                foreground: root.fg
-                font.family: root.face
-                inputMask: "99:99"
-                // Reverting on a rejected value is what tells the user it was
-                // rejected; a field left holding "9:9" would look accepted.
-                onEditingFinished: if (!root.setFixedTime("day", text)) text = root.fixedDay
-              }
-            }
-
-            Column {
-              spacing: Style.space(4)
-
-              Text {
-                text: "Night from"
-                color: root.dim
-                font.family: root.face
-                font.pixelSize: Style.font.caption
-              }
-
-              TextField {
-                width: Style.space(90)
-                text: root.fixedNight
-                foreground: root.fg
-                font.family: root.face
-                inputMask: "99:99"
-                onEditingFinished: if (!root.setFixedTime("night", text)) text = root.fixedNight
-              }
-            }
-          }
-
-          // ------------------------------------------------ light sensor
-
-          Column {
-            visible: root.effectiveAutoMode === "sensor"
-            width: parent.width
-            spacing: Style.space(8)
-
-            Item {
-              width: parent.width
-              height: Math.max(readingLabel.height, calibrate.height)
-
-              Text {
-                id: readingLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.sensorRead ? "Light now: " + root.sensorValue : "Reading…"
-                color: root.dim
-                font.family: root.face
-                font.pixelSize: Style.font.caption
-              }
-
-              // Readings are raw sensor counts, not lux, and differ by orders
-              // of magnitude between machines. Calibrating against what the
-              // sensor says right now is the only threshold that means
-              // anything.
-              Button {
-                id: calibrate
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Set from now"
-                bordered: true
-                enabled: root.sensorRead
-                foreground: root.fg
-                fontFamily: root.face
-                onClicked: root.persist({ sensor: root.sensorConfig({ threshold: Math.round(root.sensorValue) }) })
-              }
-            }
-
-            Row {
-              width: parent.width
-              spacing: Style.space(10)
-
-              NumberField {
-                label: "Threshold"
-                value: Math.round(root.sensorThreshold)
-                from: 0
-                to: 1000000
-                stepSize: 1000
-                foreground: root.fg
-                fontFamily: root.face
-                onModified: function(value) { root.persist({ sensor: root.sensorConfig({ threshold: value }) }) }
-              }
-
-              NumberField {
-                label: "Hold for (s)"
-                value: root.sensorDwellSeconds
-                from: 0
-                to: 600
-                stepSize: 15
-                foreground: root.fg
-                fontFamily: root.face
-                onModified: function(value) { root.persist({ sensor: root.sensorConfig({ dwellSeconds: value }) }) }
-              }
+              options: [
+                { value: "day", label: "Day" },
+                { value: "night", label: "Night" },
+                { value: "auto", label: "Auto" }
+              ]
+              value: root.configMode === "off" ? "" : root.configMode
+              foreground: root.fg
+              fontFamily: root.face
+              onChanged: function(value) { root.persist({ mode: value }) }
             }
 
             Text {
+              visible: root.configMode === "day" || root.configMode === "night"
               width: parent.width
-              text: root.sensorExplanation
+              text: "Pinned. The schedule is not running; switch to Auto to follow it again."
               color: root.dim
               font.family: root.face
               font.pixelSize: Style.font.caption
               wrapMode: Text.WordWrap
             }
           }
-        }
 
+          PanelSeparator { foreground: root.fg }
 
-        // ----------------------------------------------------- themes
+          // ----------------------------------------------------- slots
 
-        Column {
-          width: parent.width
-          spacing: Style.space(10)
+          // No section heading: the two cards already say DAY and NIGHT, and
+          // the panel has better uses for the line.
+          Column {
+            width: parent.width
+            spacing: Style.space(16)
 
-          PanelSectionHeader {
-            text: "THEMES"
-            foreground: root.fg
-            fontFamily: root.face
+            SlotCard { label: "DAY"; slot: "dayTheme"; slug: root.dayTheme }
+            SlotCard { label: "NIGHT"; slot: "nightTheme"; slug: root.nightTheme }
+
+            Text {
+              visible: !root.wallpaperRenderable
+              width: parent.width
+              text: "This wallpaper is in a format Qt cannot decode here, so the desktop "
+                + "paints black behind a transparent bar. Transparency is held off until "
+                + "it can render; the preference above is kept."
+              color: root.fg
+              font.family: root.face
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.WordWrap
+            }
           }
 
-          SlotCard { label: "DAY"; slot: "dayTheme"; slug: root.dayTheme }
-          SlotCard { label: "NIGHT"; slot: "nightTheme"; slug: root.nightTheme }
+          PanelSeparator { foreground: root.fg }
 
-          Text {
-            visible: !root.wallpaperRenderable
-            width: parent.width
-            text: "This wallpaper is in a format Qt cannot decode here, so the desktop "
-              + "paints black behind a transparent bar and the bar colours itself for a "
-              + "picture nobody can see. Transparency is held off until it can render. "
-              + "Install qt6-imageformats to get it back; the preference above is kept."
-            color: root.fg
-            font.family: root.face
-            font.pixelSize: Style.font.caption
-            wrapMode: Text.WordWrap
+          // -------------------------------------------------- schedule
+
+          Disclosure {
+            visible: root.configMode === "auto"
+            title: "SCHEDULE"
+            summary: root.scheduleSummary
+
+            ButtonGroup {
+              visible: root.hasLocation || root.sensorAvailable
+              width: parent.width
+              options: root.scheduleOptions
+              value: root.effectiveAutoMode
+              foreground: root.fg
+              fontFamily: root.face
+              onChanged: function(value) { root.persist({ autoMode: value }) }
+            }
+
+            Text {
+              visible: !root.hasLocation
+              width: parent.width
+              text: "Sunrise and sunset need a location. Set one in the Weather widget, "
+                + "or run:\nomarchy-weather-location --set \"City\" lat,lon"
+              color: root.dim
+              font.family: root.face
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.WordWrap
+            }
+
+            // ---------------------------------------------- sun
+
+            Column {
+              visible: root.effectiveAutoMode === "sun" && root.hasLocation
+              width: parent.width
+              spacing: Style.space(12)
+
+              DayTimeline {
+                width: parent.width
+                dayStart: root.service ? root.service.todaySunrise : 0
+                dayEnd: root.service ? root.service.todaySunset : 0
+              }
+
+              Text {
+                width: parent.width
+                text: root.locationName
+                color: root.dim
+                font.family: root.face
+                font.pixelSize: Style.font.caption
+                elide: Text.ElideRight
+              }
+
+              Dropdown {
+                width: parent.width
+                label: "Boundary"
+                options: [
+                  { value: "official", label: "Horizon (sunrise/sunset)" },
+                  { value: "civil", label: "Civil twilight" },
+                  { value: "nautical", label: "Nautical twilight" },
+                  { value: "astronomical", label: "Astronomical twilight" }
+                ]
+                value: root.twilight
+                foreground: root.fg
+                fontFamily: root.face
+                onChanged: function(value) { root.persist({ twilight: value }) }
+              }
+
+              // Nudge one side without moving the other. The strip above
+              // redraws as these change, so the effect is visible rather than
+              // guessed at.
+              Row {
+                width: parent.width
+                spacing: Style.space(12)
+
+                NumberField {
+                  label: "Sunrise ± min"
+                  value: root.sunriseOffsetMinutes
+                  from: -180
+                  to: 180
+                  stepSize: 5
+                  foreground: root.fg
+                  fontFamily: root.face
+                  onModified: function(value) { root.persist({ sunriseOffsetMinutes: value }) }
+                }
+
+                NumberField {
+                  label: "Sunset ± min"
+                  value: root.sunsetOffsetMinutes
+                  from: -180
+                  to: 180
+                  stepSize: 5
+                  foreground: root.fg
+                  fontFamily: root.face
+                  onModified: function(value) { root.persist({ sunsetOffsetMinutes: value }) }
+                }
+              }
+            }
+
+            // -------------------------------------------- fixed hours
+
+            Row {
+              visible: root.effectiveAutoMode === "fixed"
+              width: parent.width
+              spacing: Style.space(14)
+
+              Column {
+                spacing: Style.space(6)
+
+                Text {
+                  text: "Day from"
+                  color: root.dim
+                  font.family: root.face
+                  font.pixelSize: Style.font.caption
+                }
+
+                TextField {
+                  width: Style.space(90)
+                  text: root.fixedDay
+                  foreground: root.fg
+                  font.family: root.face
+                  inputMask: "99:99"
+                  // Reverting on a rejected value is what tells the user it was
+                  // rejected; a field left holding "9:9" would look accepted.
+                  onEditingFinished: if (!root.setFixedTime("day", text)) text = root.fixedDay
+                }
+              }
+
+              Column {
+                spacing: Style.space(6)
+
+                Text {
+                  text: "Night from"
+                  color: root.dim
+                  font.family: root.face
+                  font.pixelSize: Style.font.caption
+                }
+
+                TextField {
+                  width: Style.space(90)
+                  text: root.fixedNight
+                  foreground: root.fg
+                  font.family: root.face
+                  inputMask: "99:99"
+                  onEditingFinished: if (!root.setFixedTime("night", text)) text = root.fixedNight
+                }
+              }
+            }
+
+            // ------------------------------------------- light sensor
+
+            Column {
+              visible: root.effectiveAutoMode === "sensor"
+              width: parent.width
+              spacing: Style.space(12)
+
+              Item {
+                width: parent.width
+                height: Math.max(readingLabel.height, calibrate.height)
+
+                Text {
+                  id: readingLabel
+                  anchors.left: parent.left
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: root.sensorRead ? "Light now: " + root.sensorValue : "Reading…"
+                  color: root.dim
+                  font.family: root.face
+                  font.pixelSize: Style.font.caption
+                }
+
+                // Readings are raw sensor counts, not lux, and differ by orders
+                // of magnitude between machines. Calibrating against what the
+                // sensor says right now is the only threshold that means
+                // anything.
+                Button {
+                  id: calibrate
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "Set from now"
+                  bordered: true
+                  enabled: root.sensorRead
+                  foreground: root.fg
+                  fontFamily: root.face
+                  onClicked: root.persist({ sensor: root.sensorConfig({ threshold: Math.round(root.sensorValue) }) })
+                }
+              }
+
+              Row {
+                width: parent.width
+                spacing: Style.space(12)
+
+                NumberField {
+                  label: "Threshold"
+                  value: Math.round(root.sensorThreshold)
+                  from: 0
+                  to: 1000000
+                  stepSize: 1000
+                  foreground: root.fg
+                  fontFamily: root.face
+                  onModified: function(value) { root.persist({ sensor: root.sensorConfig({ threshold: value }) }) }
+                }
+
+                NumberField {
+                  label: "Hold for (s)"
+                  value: root.sensorDwellSeconds
+                  from: 0
+                  to: 600
+                  stepSize: 15
+                  foreground: root.fg
+                  fontFamily: root.face
+                  onModified: function(value) { root.persist({ sensor: root.sensorConfig({ dwellSeconds: value }) }) }
+                }
+              }
+
+              Text {
+                width: parent.width
+                text: root.sensorExplanation
+                color: root.dim
+                font.family: root.face
+                font.pixelSize: Style.font.caption
+                wrapMode: Text.WordWrap
+              }
+            }
           }
 
           Text {
             width: parent.width
-            text: "A theme picked anywhere else lands in the half of the day that is "
-              + "running."
+            text: "A theme picked anywhere else lands in the half of the day that is running."
             color: root.dim
             font.family: root.face
             font.pixelSize: Style.font.caption
