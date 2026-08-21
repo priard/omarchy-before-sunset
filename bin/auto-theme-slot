@@ -1,0 +1,73 @@
+#!/bin/bash
+
+# Everything the panel needs to draw one slot: the theme's preview image and
+# the background it will actually use, both resolved to real paths so QML can
+# load them directly.
+#
+# Resolution happens here rather than in QML because it is a filesystem
+# question — which of several directories holds the file — and QML has no
+# graceful way to ask it.
+#
+# Usage: auto-theme-slot <theme-slug>
+# Output: {"slug","name","mode","preview","background","backgroundName"}
+
+set -uo pipefail
+
+slug=${1:-}
+[[ -n $slug ]] || { echo '{}'; exit 0; }
+
+USER_THEMES="$HOME/.config/omarchy/themes"
+STOCK_THEMES="${OMARCHY_PATH:-/usr/share/omarchy}/themes"
+USER_BACKGROUNDS="$HOME/.config/omarchy/backgrounds/$slug"
+STATE="$HOME/.local/state/omarchy/settings/auto-theme.json"
+
+theme_dirs=("$USER_THEMES/$slug" "$STOCK_THEMES/$slug")
+background_dirs=("$USER_BACKGROUNDS" "$USER_THEMES/$slug/backgrounds" "$STOCK_THEMES/$slug/backgrounds")
+
+# Same names omarchy-theme-switcher looks for. A theme without one is not
+# broken, it just has no picture to show.
+find_preview() {
+  local dir candidate hit
+  for dir in "${theme_dirs[@]}"; do
+    [[ -d $dir ]] || continue
+    for candidate in preview.png preview.jpg preview.jpeg preview.webp preview.gif preview.bmp; do
+      hit=$(find -L "$dir" -maxdepth 1 -type f -iname "$candidate" -print -quit 2>/dev/null)
+      [[ -n $hit ]] && { printf '%s\n' "$hit"; return 0; }
+    done
+  done
+  return 1
+}
+
+find_background_named() {
+  local name=$1 dir
+  [[ -n $name && $name != */* ]] || return 1
+  for dir in "${background_dirs[@]}"; do
+    [[ -f $dir/$name ]] && { printf '%s\n' "$dir/$name"; return 0; }
+  done
+  return 1
+}
+
+# What omarchy-theme-set would land on with no memory: the first background it
+# finds, sorted, across the same directories it searches.
+first_background() {
+  find -L "${background_dirs[@]}" -maxdepth 1 -type f \
+    \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.gif' \
+       -o -iname '*.bmp' -o -iname '*.webp' \) 2>/dev/null | sort | head -n1
+}
+
+remembered=""
+[[ -f $STATE ]] && remembered=$(jq -r --arg slug "$slug" '.backgrounds[$slug] // ""' "$STATE" 2>/dev/null)
+
+background=$(find_background_named "$remembered") || background=$(first_background)
+preview=$(find_preview) || preview=""
+
+# "tokyo-night" -> "Tokyo Night", matching how omarchy theme list presents them.
+name=$(tr '-' ' ' <<<"$slug" | sed -E 's/\b(.)/\u\1/g')
+
+jq -n \
+  --arg slug "$slug" \
+  --arg name "$name" \
+  --arg preview "$preview" \
+  --arg background "${background:-}" \
+  --arg backgroundName "$(basename "${background:-}" 2>/dev/null)" \
+  '{$slug, $name, $preview, $background, $backgroundName}'

@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# Open Omarchy's image picker over one theme's backgrounds and print the chosen
+# file's full path.
+#
+# omarchy-theme-bg-switcher only ever offers the theme currently on screen, so
+# it cannot be used to set the wallpaper for the other half of the day. The
+# directories it would search are spelled out here for an arbitrary theme.
+#
+# Nothing is applied. The caller decides what to do with the answer.
+#
+# Usage: auto-theme-bg-pick <theme-slug> [current-filename]
+
+set -uo pipefail
+
+slug=${1:-}
+current=${2:-}
+[[ -n $slug ]] || exit 1
+
+USER_THEMES="$HOME/.config/omarchy/themes"
+STOCK_THEMES="${OMARCHY_PATH:-/usr/share/omarchy}/themes"
+
+dirs=()
+for dir in \
+  "$HOME/.config/omarchy/backgrounds/$slug" \
+  "$USER_THEMES/$slug/backgrounds" \
+  "$STOCK_THEMES/$slug/backgrounds"; do
+  [[ -d $dir ]] && dirs+=("$dir")
+done
+
+((${#dirs[@]})) || exit 1
+
+selected=""
+if [[ -n $current && $current != */* ]]; then
+  for dir in "${dirs[@]}"; do
+    [[ -f $dir/$current ]] && { selected="$dir/$current"; break; }
+  done
+fi
+
+args=()
+[[ -n $selected ]] && args+=(--selected "$selected")
+
+choice=$(omarchy-menu-images "${args[@]}" "${dirs[@]}") || exit $?
+[[ -n $choice ]] || exit 0
+
+# The full path: the caller needs it to apply the background immediately, and
+# can take the basename itself for the per-theme memory.
+printf '%s\n' "$choice"

@@ -11,8 +11,8 @@ import qs.Commons
 // copy of the state it edits.
 Panel {
   id: root
-  moduleName: "io.github.priard.auto-theme"
-  ipcTarget: "io.github.priard.auto-theme"
+  moduleName: "priard.auto-theme"
+  ipcTarget: "priard.auto-theme"
 
   // Resolved rather than bound: the service is created by the shell's service
   // loader, which may finish after the bar has already built its widgets.
@@ -195,6 +195,35 @@ Panel {
     pickerProcess.running = true
   }
 
+  // Which slot the running background picker is choosing for.
+  property string pickingBackgroundFor: ""
+
+  Process {
+    id: backgroundPicker
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var path = String(text || "").trim()
+        var slug = root.pickingBackgroundFor
+        root.pickingBackgroundFor = ""
+        if (path === "" || slug === "" || !root.service) return
+
+        root.service.setBackgroundFor(slug, path)
+      }
+    }
+  }
+
+  // Omarchy's own background switcher only ever offers the theme on screen, so
+  // it cannot set the wallpaper for the other half of the day. Same picker,
+  // pointed at the chosen slot's theme instead.
+  function pickBackground(slug, currentName) {
+    if (slug === "" || backgroundPicker.running) return
+    pickingBackgroundFor = slug
+    backgroundPicker.command = [pluginFile("bin/auto-theme-bg-pick"), canonical(slug), String(currentName || "")]
+    close()
+    backgroundPicker.running = true
+  }
+
   // ----------------------------------------------------------- lifecycle
 
   implicitWidth: button.implicitWidth
@@ -232,8 +261,85 @@ Panel {
 
   // One row per slot: the label, the theme it holds, and what that theme reads
   // as. Clicking anywhere on it opens the picker for that slot.
-  component ThemeRow: Column {
-    id: row
+  function fileUrl(path) {
+    // encodeURI leaves the separators alone and fixes the spaces, which a theme
+    // directory is perfectly entitled to contain.
+    return String(path || "") === "" ? "" : "file://" + encodeURI(String(path))
+  }
+
+  // A clickable picture with a caption underneath. Themes are not required to
+  // ship a preview and plenty do not, so the fallback is a centred label rather
+  // than an empty frame.
+  component Thumb: Column {
+    id: thumb
+
+    required property string source
+    required property string caption
+    required property string fallback
+    property bool hovered: false
+
+    signal activated()
+
+    spacing: Style.space(4)
+
+    Rectangle {
+      width: thumb.width
+      height: Math.round(thumb.width * 0.58)
+      radius: Style.cornerRadius
+      clip: true
+      color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.06)
+      border.width: 1
+      border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, thumb.hovered ? 0.5 : 0.18)
+
+      Image {
+        anchors.fill: parent
+        source: root.fileUrl(thumb.source)
+        fillMode: Image.PreserveAspectCrop
+        asynchronous: true
+        visible: status === Image.Ready
+      }
+
+      Text {
+        anchors.centerIn: parent
+        width: parent.width - Style.space(12)
+        visible: thumb.source === ""
+        text: thumb.fallback
+        color: root.dim
+        font.family: root.face
+        font.pixelSize: Style.font.caption
+        horizontalAlignment: Text.AlignHCenter
+        wrapMode: Text.WordWrap
+        maximumLineCount: 3
+        elide: Text.ElideRight
+      }
+
+      MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        onEntered: thumb.hovered = true
+        onExited: thumb.hovered = false
+        onClicked: thumb.activated()
+      }
+    }
+
+    Text {
+      width: thumb.width
+      text: thumb.caption
+      color: root.dim
+      font.family: root.face
+      font.pixelSize: Style.font.caption
+      horizontalAlignment: Text.AlignHCenter
+      elide: Text.ElideRight
+    }
+  }
+
+  // One half of the day: what it looks like, and the two things you can change
+  // about it. Both pictures are live — the theme's own preview and the exact
+  // wallpaper this slot will restore.
+  component SlotCard: Column {
+    id: card
+
     required property string label
     required property string slot
     required property string slug
@@ -241,7 +347,7 @@ Panel {
     readonly property string mode: root.service ? root.service.themeMode(slug) : ""
     readonly property bool inForce: root.service && root.service.activeSlot === slot
 
-    // No stored preference means "whatever the bar is doing now", so the toggle
+    // No stored preference means "whatever the bar is doing now", so the switch
     // shows the truth instead of a default the user never picked.
     readonly property bool transparentBar: {
       if (!root.service) return false
@@ -249,15 +355,50 @@ Panel {
       return stored === null ? root.service.barTransparent : stored === true
     }
 
+    property var info: ({})
+    readonly property string previewPath: info && info.preview ? String(info.preview) : ""
+    readonly property string backgroundPath: info && info.background ? String(info.background) : ""
+    readonly property string backgroundName: info && info.backgroundName ? String(info.backgroundName) : ""
+
+    function refresh() {
+      if (slug === "" || infoProcess.running) return
+      infoProcess.command = [root.pluginFile("bin/auto-theme-slot"), slug]
+      infoProcess.running = true
+    }
+
+    Process {
+      id: infoProcess
+      stdout: StdioCollector {
+        waitForEnd: true
+        onStreamFinished: {
+          try {
+            card.info = JSON.parse(String(text || "{}"))
+          } catch (e) {
+            card.info = ({})
+          }
+        }
+      }
+    }
+
+    // The wallpaper can change without the theme changing, so the card follows
+    // the remembered state rather than only its own slug.
+    Connections {
+      target: root.service
+      enabled: root.service !== null
+      function onBackgroundMemoryChanged() { card.refresh() }
+    }
+
+    onSlugChanged: refresh()
+    Component.onCompleted: refresh()
+
     width: parent.width
-    spacing: Style.space(4)
+    spacing: Style.space(6)
 
     Row {
-      width: parent.width
       spacing: Style.space(6)
 
       Text {
-        text: row.label
+        text: card.label
         color: root.dim
         font.family: root.face
         font.pixelSize: Style.font.caption
@@ -265,39 +406,65 @@ Panel {
       }
 
       Text {
-        visible: row.mode !== ""
-        text: "(" + row.mode + ")"
+        visible: card.mode !== ""
+        text: "(" + card.mode + ")"
         color: root.dim
         font.family: root.face
         font.pixelSize: Style.font.caption
       }
 
       Text {
-        visible: row.inForce
-        text: "· now"
+        visible: card.inForce
+        text: "\u00b7 now"
         color: root.dim
         font.family: root.face
         font.pixelSize: Style.font.caption
       }
     }
 
-    Button {
+    Row {
       width: parent.width
-      text: row.slug === "" ? "Choose a theme…" : root.displayName(row.slug)
-      bordered: true
-      foreground: root.fg
-      fontFamily: root.face
-      onClicked: root.pickTheme(row.slot, row.slug)
+      spacing: Style.space(8)
+
+      Thumb {
+        width: (parent.width - Style.space(8)) / 2
+        source: card.previewPath
+        caption: card.slug === "" ? "Choose a theme" : root.displayName(card.slug)
+        fallback: card.slug === "" ? "Choose a theme" : root.displayName(card.slug)
+        onActivated: root.pickTheme(card.slot, card.slug)
+      }
+
+      Thumb {
+        width: (parent.width - Style.space(8)) / 2
+        source: card.backgroundPath
+        caption: card.backgroundName === "" ? "No background" : card.backgroundName
+        fallback: "No background"
+        onActivated: root.pickBackground(card.slug, card.backgroundName)
+      }
     }
 
-    Toggle {
+    Item {
       width: parent.width
-      label: "Transparent bar"
-      checked: row.transparentBar
-      foreground: root.fg
-      fontFamily: root.face
-      enabled: row.slug !== ""
-      onClicked: if (root.service) root.service.rememberTransparency(row.slug, !row.transparentBar)
+      height: transparencySwitch.height
+
+      Text {
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        text: "Transparent bar"
+        color: root.dim
+        font.family: root.face
+        font.pixelSize: Style.font.caption
+      }
+
+      ToggleSwitch {
+        id: transparencySwitch
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        checked: card.transparentBar
+        foreground: root.fg
+        interactive: card.slug !== ""
+        onToggled: if (root.service) root.service.rememberTransparency(card.slug, !card.transparentBar)
+      }
     }
   }
 
@@ -490,8 +657,8 @@ Panel {
             fontFamily: root.face
           }
 
-          ThemeRow { label: "DAY"; slot: "dayTheme"; slug: root.dayTheme }
-          ThemeRow { label: "NIGHT"; slot: "nightTheme"; slug: root.nightTheme }
+          SlotCard { label: "DAY"; slot: "dayTheme"; slug: root.dayTheme }
+          SlotCard { label: "NIGHT"; slot: "nightTheme"; slug: root.nightTheme }
 
           Text {
             visible: !root.wallpaperRenderable
@@ -508,9 +675,8 @@ Panel {
 
           Text {
             width: parent.width
-            text: "Changing the theme anywhere else — the menu, the theme switcher — "
-              + "sets it for whichever half of the day is running. Backgrounds and bar "
-              + "transparency are remembered per theme."
+            text: "A theme picked anywhere else lands in the half of the day that is "
+              + "running."
             color: root.dim
             font.family: root.face
             font.pixelSize: Style.font.caption

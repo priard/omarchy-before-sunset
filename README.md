@@ -67,7 +67,7 @@ Then put the widget on the bar from the bar settings, or add it to
 `~/.config/omarchy/shell.json` by hand:
 
 ```json
-{ "id": "io.github.priard.auto-theme" }
+{ "id": "priard.auto-theme" }
 ```
 
 The plugin seeds itself on first run: the theme already on screen takes the
@@ -78,7 +78,7 @@ from under you.
 ## Removal
 
 ```bash
-omarchy plugin remove io.github.priard.auto-theme
+omarchy plugin remove priard.auto-theme
 ```
 
 That leaves two things behind, both safe to delete:
@@ -104,15 +104,19 @@ from/to pair. The sunrise option only appears once a location is known;
 without one there is nothing to compute, so the panel says so and offers fixed
 hours alone.
 
-**THEMES** — one row per slot: the theme it holds, what that theme reads as,
-which slot is in force, and a transparency toggle. Clicking the theme opens
-Omarchy's own picker, previews and all.
+**THEMES** — one card per slot, showing the two pictures that actually decide
+how that half of the day looks: the theme's own preview and the exact wallpaper
+the slot will restore. Under them, what the theme reads as, which slot is in
+force, and a transparency switch.
 
-The picker opens with *that slot's* theme selected, not the one on screen —
-those differ whenever you are setting up the half of the day that is not
-currently running. Browsing changes nothing: the picker only reports a
-committed choice, and a choice made for the inactive slot is stored without
-touching the desktop.
+Click the theme to open Omarchy's theme picker. Click the wallpaper to pick a
+different one from that theme's backgrounds. Themes are not required to ship a
+preview image, so cards for those show the name instead of an empty frame.
+
+Both pickers open with *that slot's* current choice selected, not the one on
+screen — those differ whenever you are setting up the half of the day that is
+not running. Browsing changes nothing, and a choice made for the inactive slot
+is stored without touching the desktop.
 
 ## Location
 
@@ -190,7 +194,7 @@ the same precedence the shell's own `updateEntryInline` uses.
 
 ```json
 {
-  "id": "io.github.priard.auto-theme",
+  "id": "priard.auto-theme",
   "dayTheme": "catppuccin-latte",
   "nightTheme": "matte-black",
   "mode": "auto",
@@ -266,6 +270,8 @@ bin/auto-theme-apply   switch a theme, restoring its remembered background
 bin/auto-theme-pick    open the theme picker with a given theme preselected
 bin/auto-theme-themes  list installed themes and which side each reads as
 bin/auto-theme-bg-state  the current wallpaper, and whether Qt can decode it
+bin/auto-theme-bg-pick   pick a wallpaper from any theme's backgrounds
+bin/auto-theme-slot      resolve a slot's preview and wallpaper for the panel
 ```
 
 ## Requirements and dependencies

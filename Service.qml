@@ -20,7 +20,7 @@ Item {
   property var shell: null
   property var manifest: null
 
-  readonly property string pluginId: "io.github.priard.auto-theme"
+  readonly property string pluginId: "priard.auto-theme"
   readonly property string home: Quickshell.env("HOME")
   readonly property string stateDir: home + "/.local/state/omarchy"
   readonly property string themeNamePath: stateDir + "/current/theme.name"
@@ -451,6 +451,26 @@ Item {
     next[key] = value === true
     transparencyMemory = next
     saveMemory()
+  }
+
+  // A background chosen for a slot: always remembered, and applied right away
+  // only when that slot is the one on screen. Applying the night wallpaper in
+  // the middle of the afternoon would be exactly wrong.
+  function setBackgroundFor(slug, path) {
+    var file = String(path || "").split("/").pop()
+    if (file === "") return
+
+    rememberBackground(slug, file)
+
+    if (canonical(slug) === currentTheme) {
+      backgroundApply.command = ["omarchy-theme-bg-set", String(path)]
+      backgroundApply.running = true
+    }
+  }
+
+  Process {
+    id: backgroundApply
+    onExited: Qt.callLater(root.probeBackground)
   }
 
   Process {
