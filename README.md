@@ -25,6 +25,48 @@ command, and the shell hosts long-running plugins. What was missing was
 something to decide *when*, and somewhere to keep the two choices apart. That
 is all this plugin is.
 
+### It is not the only one
+
+Other people have built versions of this — Darky, Dusk, Theme Scheduler,
+NightMan, and probably more by the time you read it. Some I found only after
+starting; some may not have existed yet. Go and look at them: one of them may
+suit you better, and none of us is going to mind.
+
+That several of these exist is not a problem to be solved. It is the whole
+point of the arrangement. On this kind of system you can simply write the thing
+you want, the way you think it ought to work, on the evening you decide you
+want it — and then leave it out where the next person can take it or ignore it.
+This one is a mix of what I liked in the others, my own ideas, and a run of
+stray thoughts about how the day ought to turn over.
+
+<details>
+<summary><b>The longer answer, if you have a minute</b></summary>
+
+<br>
+
+My first Linux was Red Hat 5.0 — the one called Hurricane — in 1997. I was
+thrilled by it, and stayed thrilled through a long run of distributions after
+that. Then work happened. Windows for years, then macOS for more years, with
+the occasional wistful glance over the fence at whatever the Linux world was
+up to that decade.
+
+Omarchy put me back over the fence, and it turns out I had missed it more than
+I knew. I have not enjoyed anything this much in a long time: the poking, the
+reading of other people's shell scripts, the discovery that the thing you
+assumed was hard-coded is in fact a TOML file you are allowed to edit. It has
+cost me an unreasonable number of hours lately. I regret none of them.
+
+Before Sunset was meant to be a small thing for my own machine — pick two
+themes, follow the sun, done by Tuesday. Then I kept asking what else was
+possible, and it stopped being small. Somewhere along the way it grew opinions
+about wallpapers, bar transparency, the volume after dark, and the exact colour
+of the screen at twenty past nine.
+
+This is where it got to. It is here as-is, in case it is useful to someone
+else. Enjoy.
+
+</details>
+
 ## What it does
 
 - Switches themes at sunrise and sunset, computed locally from your
