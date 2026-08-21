@@ -5,6 +5,25 @@ Notable changes to Auto Theme.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-08-21
+
+### Fixed
+
+- **The transparency switch now takes effect immediately** on the half of the
+  day that is running. It only stored the preference before, applying it at the
+  next theme switch, which reads as a switch that does nothing. Slots that are
+  not running are still stored and left alone — changing the night theme's bar
+  in the middle of the afternoon should not touch the desktop.
+
+### Added
+
+- **A sensor picker when the machine has more than one.** Laptops often carry
+  two, and they disagree by design, so the default remains their average. The
+  labels carry each sensor's live reading, because two devices both reporting
+  themselves as `als` are otherwise impossible to tell apart. A named sensor
+  that disappears — across a suspend, say — falls back to the average rather
+  than going blind.
+
 ## [0.2.0] - 2026-08-21
 
 More ways to decide which half of the day it is, and a panel that shows what

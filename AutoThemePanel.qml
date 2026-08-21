@@ -48,6 +48,23 @@ Panel {
   readonly property real sensorThreshold: service ? service.sensorThreshold : 0
   readonly property int sensorDwellSeconds: service ? service.sensorDwellSeconds : 45
   readonly property string sensorPending: service ? String(service.sensorCandidate) : ""
+  readonly property var sensorDevices: service && service.sensorDevices ? service.sensorDevices : []
+  readonly property string sensorDevice: service ? String(service.sensorDevice) : ""
+
+  // Live values in the labels on purpose: two sensors both called "als" are
+  // otherwise indistinguishable, and what they currently read is the only thing
+  // that tells them apart.
+  readonly property var sensorDeviceOptions: {
+    var options = [{ value: "", label: "Average of all sensors" }]
+    for (var i = 0; i < sensorDevices.length; i++) {
+      var device = sensorDevices[i]
+      options.push({
+        value: String(device.path),
+        label: String(device.name) + " (" + String(device.id) + ") — " + device.value
+      })
+    }
+    return options
+  }
 
   // A chosen schedule that cannot run falls back rather than freezing the
   // desktop, and the panel shows what is actually in force. The service
@@ -73,7 +90,8 @@ Panel {
     var next = ({
       threshold: Math.round(sensorThreshold),
       hysteresis: service ? service.sensorHysteresis : 0.15,
-      dwellSeconds: sensorDwellSeconds
+      dwellSeconds: sensorDwellSeconds,
+      device: sensorDevice
     })
     for (var key in current) if (next[key] === undefined) next[key] = current[key]
     for (var change in changes) next[change] = changes[change]
@@ -980,6 +998,28 @@ Panel {
               visible: root.effectiveAutoMode === "sensor"
               width: parent.width
               spacing: Style.space(12)
+
+              Dropdown {
+                visible: root.sensorDevices.length > 1
+                width: parent.width
+                label: "Sensor"
+                options: root.sensorDeviceOptions
+                value: root.sensorDevice
+                foreground: root.fg
+                fontFamily: root.face
+                onChanged: function(value) { root.persist({ sensor: root.sensorConfig({ device: value }) }) }
+              }
+
+              Text {
+                visible: root.sensorDevices.length > 1
+                width: parent.width
+                text: "Sensors read differently from one another, so check the threshold "
+                  + "after switching between them."
+                color: root.dim
+                font.family: root.face
+                font.pixelSize: Style.font.caption
+                wrapMode: Text.WordWrap
+              }
 
               Item {
                 width: parent.width

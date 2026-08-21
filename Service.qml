@@ -152,9 +152,18 @@ Item {
     return isNaN(value) || value < 0 ? 45 : Math.round(value)
   }
 
+  // Empty means "average whatever is there". A machine can carry more than one
+  // sensor — one per screen corner, say — and they disagree by design, so the
+  // mean is the steadier signal until someone knows better than the default.
+  readonly property string sensorDevice: {
+    var value = sensorSettings ? sensorSettings.device : undefined
+    return value === undefined || value === null ? "" : String(value)
+  }
+
   property bool sensorAvailable: false
   property real sensorValue: 0
   property bool sensorRead: false
+  property var sensorDevices: []
 
   // The side the sensor has committed to, and the one it is currently arguing
   // for but has not held long enough.
@@ -222,11 +231,30 @@ Item {
         }
 
         root.sensorAvailable = reading.available === true
-        if (root.sensorAvailable && reading.value !== null) {
-          root.sensorValue = Number(reading.value)
-          root.sensorRead = true
-          root.applySensorReading()
+        root.sensorDevices = Array.isArray(reading.devices) ? reading.devices : []
+        if (!root.sensorAvailable) return
+
+        var value = null
+
+        // A named device that is no longer there falls back to the average
+        // rather than going blind: sensors can vanish across a suspend, and a
+        // stale name should not take the schedule down with it.
+        if (root.sensorDevice !== "") {
+          for (var i = 0; i < root.sensorDevices.length; i++) {
+            var device = root.sensorDevices[i]
+            if (String(device.path) === root.sensorDevice || String(device.id) === root.sensorDevice) {
+              value = Number(device.value)
+              break
+            }
+          }
         }
+
+        if (value === null && reading.value !== null) value = Number(reading.value)
+        if (value === null) return
+
+        root.sensorValue = value
+        root.sensorRead = true
+        root.applySensorReading()
       }
     }
   }
@@ -695,6 +723,12 @@ Item {
 
   onWallpaperRenderableChanged: Qt.callLater(applyBarTransparency)
 
+  // Flipping the switch on the half of the day that is running should change
+  // the bar there and then. Without this the preference was only stored and
+  // took effect at the next theme switch, which reads as the switch being
+  // broken. Slots that are not running are stored and left alone, as before.
+  onTransparencyMemoryChanged: Qt.callLater(applyBarTransparency)
+
   function probeBackground() {
     if (!backgroundProbe.running) backgroundProbe.running = true
   }
@@ -909,7 +943,9 @@ Item {
           hysteresis: root.sensorHysteresis,
           dwellSeconds: root.sensorDwellSeconds,
           side: root.sensorSide,
-          pending: root.sensorCandidate
+          pending: root.sensorCandidate,
+          device: root.sensorDevice,
+          devices: root.sensorDevices
         }
       })
     }

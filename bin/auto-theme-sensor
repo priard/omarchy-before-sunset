@@ -12,7 +12,8 @@
 # threshold means nothing until it is set against a particular sensor. The
 # caller is expected to calibrate from live readings rather than ship a number.
 #
-# Output: {"available":bool,"value":number|null,"devices":[{"path","value"}]}
+# Output: {"available":bool,"value":number|null,
+#          "devices":[{"path","id","name","value"}]}
 
 set -uo pipefail
 
@@ -46,11 +47,16 @@ read_channel() {
   return 1
 }
 
+names=()
+
 for dir in /sys/bus/iio/devices/iio:device*; do
   [[ -d $dir ]] || continue
   value=$(read_channel "$dir") || continue
   devices+=("$dir")
   values+=("$value")
+  # Drivers name themselves; "als" is the common one and says nothing on its
+  # own, which is why the caller also gets the device id to tell two apart.
+  names+=("$(cat "$dir/name" 2>/dev/null || echo sensor)")
 done
 
 if ((${#values[@]} == 0)); then
@@ -64,7 +70,12 @@ average=$(printf '%s\n' "${values[@]}" | awk '{ total += $1; n++ } END { printf 
 
 per_device=$(
   for i in "${!devices[@]}"; do
-    jq -nc --arg path "${devices[$i]}" --argjson value "${values[$i]}" '{$path, $value}'
+    jq -nc \
+      --arg path "${devices[$i]}" \
+      --arg id "$(basename "${devices[$i]}")" \
+      --arg name "${names[$i]}" \
+      --argjson value "${values[$i]}" \
+      '{$path, $id, $name, $value}'
   done | jq -sc '.'
 )
 
