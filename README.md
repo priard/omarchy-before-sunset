@@ -686,10 +686,12 @@ the volume fade, `hyprctl` for the night light and the monitor list, `gdbus`
 for the resume announcement, and `udevadm` to tell two identical displays
 apart, all part of a base install.
 
-Brightness on Apple's displays goes through `asdcontrol`, which Omarchy ships
-in its base packages along with the `/etc/sudoers.d` rule that lets it run
-without a password. Where that rule is absent the displays simply do not appear
-in the list, and nothing prompts. It makes no network requests: sunrise and sunset
+Brightness on Apple's displays goes through `asdcontrol`, which Omarchy ships in
+its base packages along with the `/etc/sudoers.d` rule that lets it run without a
+password. That rule is Omarchy's own file and grants exactly one command —
+`NOPASSWD: /usr/bin/asdcontrol` — which this plugin reads and never installs,
+edits or removes. Every call passes `-n`, so where the rule is absent the
+displays simply do not appear in the list and nothing prompts. It makes no network requests: sunrise and sunset
 are arithmetic, not an API call.
 
 It listens on the system bus for logind's resume announcement, which is a
