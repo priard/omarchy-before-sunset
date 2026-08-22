@@ -149,15 +149,38 @@ stops and says so rather than touching your work.
 omarchy plugin remove priard.before-sunset
 ```
 
-That leaves two things behind, both safe to delete:
+That disables the plugin, unloads it and deletes its directory. No restart is
+needed: the shell rescans its plugins on the way out.
+
+It leaves two things behind, both safe to delete and neither of them removed for
+you, because they are yours. The remembered wallpapers and per-theme bar
+transparency:
 
 ```bash
-rm ~/.local/state/omarchy/settings/before-sunset.json   # remembered backgrounds and transparency
+rm ~/.local/state/omarchy/settings/before-sunset.json
 ```
 
-and the plugin's entry in `~/.config/omarchy/shell.json`, if you added one by
-hand. Your themes, wallpapers and bar settings are untouched — the plugin only
-ever drove Omarchy's own commands.
+And the plugin's own entry in `~/.config/omarchy/shell.json`, which holds the
+slots, the schedule and the levels — wherever you put the widget, and in the
+`plugins` list if it is there too:
+
+```bash
+jq '(.bar.layout |= map_values(map(select(.id != "priard.before-sunset"))))
+    | (.plugins |= map(select(.id != "priard.before-sunset")))' \
+  ~/.config/omarchy/shell.json > /tmp/shell.json &&
+  mv /tmp/shell.json ~/.config/omarchy/shell.json
+```
+
+The shell reads that file as it changes, so this needs no restart either. Run it
+before reinstalling if you want the plugin to seed itself from scratch rather
+than pick up where it left off.
+
+One thing genuinely stays changed: the bar's `transparent` flag is left wherever
+the schedule last set it, because it is a bar setting rather than a plugin one.
+Set it back from the bar settings if the last theme's preference was not yours.
+Your themes and wallpapers stay as they are — the plugin only ever drove
+Omarchy's own commands, and the one on screen when it left is simply the one you
+were using.
 
 ## The panel
 

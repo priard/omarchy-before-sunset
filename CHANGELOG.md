@@ -9,6 +9,17 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Removal says how to remove everything**, with the commands rather than the
+  names. The entry in `shell.json` needed a `jq` line, because it can sit in the
+  bar layout, the plugins list, or both; deleting it by hand meant finding it
+  first. Neither leftover is deleted for you — they hold choices you made — and
+  neither step needs a restart, because `omarchy plugin remove` rescans on the
+  way out and the shell reads its config as it changes.
+
+  Also named the one thing that genuinely stays changed: the bar's `transparent`
+  flag, which is a bar setting rather than a plugin one, and is left wherever
+  the schedule last put it.
+
 - **The night light stops asking every three seconds when nobody is looking.**
   Each probe is a shell script, an `hyprctl` round trip and a `jq` — thirty-two
   milliseconds measured, which at three seconds is twenty-eight thousand runs a
