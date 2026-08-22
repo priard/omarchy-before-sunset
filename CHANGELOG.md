@@ -5,6 +5,43 @@ Notable changes to Before Sunset.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-08-22
+
+### Added
+
+- **The screens dim at night.** A night level and a day level, and every
+  display that can be driven moves to them when the day turns over — the same
+  shape the volume has, with the same one-directional rule. Night dims and
+  never brightens, day brightens and never dims, so a screen turned down by
+  hand in the afternoon is still where it was left at dusk. A floor of a few
+  percent sits under every target, because a screen at zero is a screen nobody
+  can find the setting on again.
+
+  One pair of numbers covers most setups, so that is what the section shows.
+  **Per display** folds open a row for each display that answered, each
+  starting on the pair above — taking one off the pair never changes what the
+  screen is doing, only what moves it next time. Overrides are keyed by EDID
+  serial rather than by connector, so a display keeps its numbers across a
+  replug, and keeps them while it is unplugged.
+
+  Displays that answer nothing are not listed and not reported. Where none
+  answers, the section is not drawn at all, the same way the light sensor is
+  absent on machines without one.
+
+  No notification: this is the one scheduled change nobody can fail to notice.
+
+- **Apple's displays are driven per device.** `omarchy-brightness-display
+  --monitor DP-2` takes the monitor name and then hands the work to a helper
+  that ignores it, driving whichever Apple display it detected first. With two
+  Studio Displays connected, every write lands on the same panel and the other
+  never moves — so those are addressed directly, for the same reason the night
+  light drives `hyprsunset` rather than Omarchy's toggle.
+
+  Which one is on which connector is not knowable: a display's EDID serial and
+  its USB serial have nothing in common. So they are listed as displays rather
+  than as monitors, and the live reading in each row is what tells two
+  identical panels apart.
+
 ## [0.6.4] - 2026-08-22
 
 ### Added

@@ -529,6 +529,7 @@ Item {
 
     lastScheduledSide = autoSide
     fadeVolumeFor(autoSide)
+    applyBrightnessFor(autoSide)
   }
 
   function fadeVolumeFor(newSide) {
@@ -546,6 +547,111 @@ Item {
 
     if (notifyOnChange)
       notify(newSide === "night" ? "Quieting down" : "Back up", "Volume easing to " + target + "%")
+  }
+
+  // ----------------------------------------------------------- brightness
+
+  readonly property var brightnessSettings: setting("brightness", ({}))
+
+  // Same convention the volume uses: -1 means "leave this alone". Unlike the
+  // volume there is no level that means off — a screen at zero is a screen
+  // nobody can find the setting on — so the script keeps a floor under it.
+  function brightnessLevel(value) {
+    if (value === undefined || value === null || value === "") return -1
+
+    var parsed = parseInt(value, 10)
+    return isNaN(parsed) || parsed < 0 || parsed > 100 ? -1 : parsed
+  }
+
+  readonly property int nightBrightness: brightnessLevel(brightnessSettings ? brightnessSettings.night : undefined)
+  readonly property int dayBrightness: brightnessLevel(brightnessSettings ? brightnessSettings.day : undefined)
+
+  readonly property var brightnessOverrides: {
+    var value = brightnessSettings ? brightnessSettings.displays : null
+    return value && typeof value === "object" ? value : ({})
+  }
+
+  // One entry per display that answers, which is not one per monitor: two
+  // Studio Displays are two entries with no connector between them, and a
+  // monitor with no DDC is no entry at all. See bin/before-sunset-brightness.
+  property var brightnessTargets: []
+  property bool brightnessProbed: false
+
+  readonly property bool brightnessAvailable: brightnessTargets.length > 0
+
+  // An override that names a half wins for that half; one that does not name it
+  // falls back to the pair everything else follows. Naming it as null is how a
+  // display says "not me" — the same null the top pair uses for the same thing.
+  function brightnessFor(id, side) {
+    var own = brightnessOverrides ? brightnessOverrides[id] : null
+    if (own && own.hasOwnProperty(side)) return brightnessLevel(own[side])
+    return side === "night" ? nightBrightness : dayBrightness
+  }
+
+  function applyBrightnessFor(newSide) {
+    var moved = false
+
+    for (var i = 0; i < brightnessTargets.length; i++) {
+      var id = String(brightnessTargets[i].id || "")
+      if (id === "") continue
+
+      var level = brightnessFor(id, newSide)
+      if (level < 0) continue
+
+      // Detached, like the volume fade: a DDC write can sit for a second
+      // waiting on the monitor's firmware, and a display that never answers
+      // must not hold up the one next to it.
+      Quickshell.execDetached([
+        pluginFile("bin/before-sunset-brightness"),
+        id,
+        String(level),
+        newSide === "night" ? "down" : "up"
+      ])
+      moved = true
+    }
+
+    // No notification. This is the one thing on the schedule nobody can fail to
+    // notice, and saying so in a popup would be telling someone what they are
+    // looking at.
+    if (moved) brightnessSettle.restart()
+  }
+
+  // The writes are detached and land at their own pace; the panel's numbers are
+  // re-read once they have had time to.
+  Timer {
+    id: brightnessSettle
+    interval: 3000
+    onTriggered: root.probeBrightness()
+  }
+
+  Process {
+    id: brightnessProbeProcess
+    command: [root.pluginFile("bin/before-sunset-brightness")]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var reading
+        try {
+          reading = JSON.parse(String(text || "{}"))
+        } catch (e) {
+          return
+        }
+
+        root.brightnessTargets = Array.isArray(reading.targets) ? reading.targets : []
+        root.brightnessProbed = true
+      }
+    }
+  }
+
+  function probeBrightness() {
+    if (!brightnessProbeProcess.running) brightnessProbeProcess.running = true
+  }
+
+  // A display arriving or leaving changes the list, and nobody should have to
+  // reopen the panel for it to notice.
+  Connections {
+    target: Quickshell
+    function onScreensChanged() { Qt.callLater(root.probeBrightness) }
   }
 
   // ------------------------------------------------------- light sensor
@@ -1469,13 +1575,14 @@ Item {
     // A sensor reading taken before the suspend describes a room that has had
     // all night to change, and the schedule is about to be computed from it.
     if (configMode === "auto" && configAutoMode === "sensor") probeSensor()
+    probeBrightness()
     evaluate()
     wakeSettle.restart()
   }
 
   // Probed once at startup even when the sensor is not in use, so the panel can
   // offer the option only on machines that actually have one.
-  Component.onCompleted: { loadThemes(); probeSensor() }
+  Component.onCompleted: { loadThemes(); probeSensor(); probeBrightness() }
 
   onSettingsChanged: Qt.callLater(evaluate)
   onStoredLocationChanged: Qt.callLater(evaluate)
@@ -1527,6 +1634,12 @@ Item {
           ramping: root.nightlightRamping,
           heldUntil: root.nightlightHeldUntil > 0
             ? new Date(root.nightlightHeldUntil).toISOString() : null
+        },
+        brightness: {
+          night: root.nightBrightness,
+          day: root.dayBrightness,
+          displays: root.brightnessTargets,
+          overrides: root.brightnessOverrides
         },
         volume: {
           night: root.nightVolume,

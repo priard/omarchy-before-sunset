@@ -1,0 +1,250 @@
+#!/bin/bash
+
+# List the displays whose brightness can be driven, or set one of them.
+#
+# Three kinds of display answer to three different mechanisms, and Omarchy
+# already knows which is which — `omarchy-brightness-display` picks between the
+# internal panel's backlight, DDC/CI over i2c, and asdcontrol for Apple's
+# displays. This goes through that command for the first two.
+#
+# The Apple case is driven directly, for the same reason the night light drives
+# hyprsunset rather than omarchy-toggle-nightlight: the command cannot do what
+# is needed here. `omarchy-brightness-display --monitor DP-2` takes the monitor
+# name, hands it to omarchy-brightness-display-apple, and that helper ignores it
+# — it drives whichever hiddev device it detected first. With two Studio
+# Displays connected, every write lands on the same panel and the other never
+# moves. Addressing the devices ourselves is the only way both of them dim.
+#
+# Which device is which monitor, though, is not knowable: a display's EDID
+# serial (0x7F572A18) and its USB serial (00008030-001D196826F8802E) have
+# nothing in common. So Apple displays are targets in their own right rather
+# than being tied to a connector, and the caller is expected to say so.
+#
+# Usage:
+#   before-sunset-brightness                       list targets as JSON
+#   before-sunset-brightness <id> <percent> [down|up|both]
+#
+#   down  act only if the display is brighter than the target (the dusk case)
+#   up    act only if it is dimmer (the dawn one)
+#   both  move it either way
+#
+# Output of the listing:
+#   {"targets":[{"id","kind","label","monitor","value"}]}
+#
+# ids are stable across a reboot and a replug: an EDID serial for a monitor, a
+# USB serial for an Apple display. The connector name is reported too, because
+# that is what the write needs, but it is never the identity — DP-1 becomes
+# DP-2 the moment two cables change places.
+
+set -uo pipefail
+
+# Never leave a screen too dark to find the setting that did it. DDC clamps to
+# 1% on its own, which is close enough to off to frighten someone.
+FLOOR=5
+
+apple_devices() {
+  local paths=()
+  local path
+
+  for path in /dev/usb/hiddev* /dev/hiddev*; do
+    [[ -e $path ]] && paths+=("$path")
+  done
+
+  ((${#paths[@]} > 0)) || return 0
+
+  # --detect prints one SUPPORTED line per Apple display it can drive; every
+  # other hiddev on the machine (keyboards, the odd docking station) is quiet.
+  sudo -n asdcontrol --detect "${paths[@]}" 2>/dev/null |
+    awk -F: '/USB Monitor.*SUPPORTED/ { print $1 }'
+}
+
+usb_serial() {
+  local dir
+  dir=$(udevadm info -q path -n "$1" 2>/dev/null) || return 1
+  dir="/sys$dir"
+
+  # The serial lives on the USB device, several levels above the hiddev node.
+  while [[ $dir != / && ! -r $dir/serial ]]; do dir=$(dirname "$dir"); done
+  [[ -r $dir/serial ]] || return 1
+  cat "$dir/serial"
+}
+
+apple_percent() {
+  # asdcontrol reports the raw value out of 60000, the same scale it takes.
+  sudo -n asdcontrol "$1" 2>/dev/null |
+    awk -F= '/BRIGHTNESS=/ { print int($2 * 100 / 60000); found = 1; exit } END { exit !found }'
+}
+
+monitors_json() {
+  hyprctl -j monitors 2>/dev/null | jq -c '[.[] | select(.disabled != true)]' 2>/dev/null
+}
+
+# ------------------------------------------------------------------ listing
+
+list_targets() {
+  local monitors entries=()
+  monitors=$(monitors_json)
+  [[ -n $monitors ]] || monitors='[]'
+
+  local name serial description model make internal_seen=0
+
+  while IFS=$'\t' read -r name description make model serial; do
+    [[ -n $name ]] || continue
+
+    if [[ $name =~ ^(eDP|LVDS|DSI)- ]]; then
+      # One backlight, however many internal panels a machine claims: the
+      # kernel exposes a single device and Omarchy picks it.
+      ((internal_seen)) && continue
+      internal_seen=1
+
+      local value
+      value=$(omarchy-brightness-display --monitor "$name" 2>/dev/null)
+      [[ $value =~ ^[0-9]+$ ]] || continue
+
+      entries+=("$(jq -nc --arg id "panel" --arg kind "backlight" \
+        --arg label "${description:-$name}" --arg monitor "$name" --argjson value "$value" \
+        '{$id, $kind, $label, $monitor, $value}')")
+      continue
+    fi
+
+    # Apple displays are enumerated by device below; listing them here as well
+    # would offer the same panel twice under two different ids.
+    if [[ $make == "Apple Computer Inc" && $model =~ (StudioDisplay|ProDisplayXDR|Studio\ XDR) ]]; then
+      continue
+    fi
+
+    # The read is the capability test. A monitor with no DDC, or one whose
+    # firmware refuses the brightness code, simply says nothing and is left out
+    # of the list rather than being reported as broken.
+    local value
+    value=$(omarchy-brightness-display-ddc "$name" 2>/dev/null)
+    [[ $value =~ ^[0-9]+$ ]] || continue
+
+    local id="$serial"
+    [[ -n $id && $id != "null" ]] || id="$name"
+
+    entries+=("$(jq -nc --arg id "ddc:$id" --arg kind "ddc" \
+      --arg label "${description:-$name}" --arg monitor "$name" --argjson value "$value" \
+      '{$id, $kind, $label, $monitor, $value}')")
+  done < <(printf '%s' "$monitors" | jq -r '.[] | [.name, .description, .make, .model, .serial] | @tsv')
+
+  local device serial percent
+  while read -r device; do
+    [[ -n $device ]] || continue
+    serial=$(usb_serial "$device") || continue
+    percent=$(apple_percent "$device") || continue
+
+    entries+=("$(jq -nc --arg id "apple:$serial" --arg kind "apple" \
+      --arg label "Apple Studio Display" --arg monitor "" --argjson value "$percent" \
+      '{$id, $kind, $label, $monitor, $value}')")
+  done < <(apple_devices)
+
+  if ((${#entries[@]} == 0)); then
+    jq -n '{targets: []}'
+    return 0
+  fi
+
+  printf '%s\n' "${entries[@]}" | jq -sc '{targets: .}'
+}
+
+# ------------------------------------------------------------------ setting
+
+resolve_monitor() {
+  # An id outlives the connector it was seen on, so the name is looked up fresh
+  # every time rather than remembered.
+  local wanted=$1 monitors
+  monitors=$(monitors_json)
+  [[ -n $monitors ]] || return 1
+
+  printf '%s' "$monitors" |
+    jq -r --arg wanted "$wanted" '
+      (.[] | select(.serial == $wanted) | .name),
+      (.[] | select(.name == $wanted) | .name)
+    ' 2>/dev/null | head -n1
+}
+
+resolve_apple_device() {
+  local wanted=$1 device serial
+
+  while read -r device; do
+    [[ -n $device ]] || continue
+    serial=$(usb_serial "$device") || continue
+    if [[ $serial == "$wanted" ]]; then
+      printf '%s\n' "$device"
+      return 0
+    fi
+  done < <(apple_devices)
+
+  return 1
+}
+
+set_target() {
+  local id=$1 target=$2 direction=$3
+  local current="" monitor="" device=""
+
+  case "$id" in
+  panel)
+    monitor=$(monitors_json | jq -r '.[] | select(.name | test("^(eDP|LVDS|DSI)-")) | .name' | head -n1)
+    [[ -n $monitor ]] || return 1
+    current=$(omarchy-brightness-display --monitor "$monitor" 2>/dev/null)
+    ;;
+  ddc:*)
+    monitor=$(resolve_monitor "${id#ddc:}") || return 1
+    [[ -n $monitor ]] || return 1
+    current=$(omarchy-brightness-display-ddc "$monitor" 2>/dev/null)
+    ;;
+  apple:*)
+    device=$(resolve_apple_device "${id#apple:}") || return 1
+    current=$(apple_percent "$device") || return 1
+    ;;
+  *)
+    echo "unknown target: $id" >&2
+    return 1
+    ;;
+  esac
+
+  [[ $current =~ ^[0-9]+$ ]] || return 1
+
+  # The whole point of the direction: dusk may only darken and dawn may only
+  # brighten, so a screen someone has already turned down for their own reasons
+  # is left where they put it.
+  case "$direction" in
+  down) ((current > target)) || return 0 ;;
+  up) ((current < target)) || return 0 ;;
+  esac
+
+  ((current != target)) || return 0
+
+  if [[ -n $device ]]; then
+    sudo -n asdcontrol "$device" -- "${target}%" >/dev/null 2>&1
+    return
+  fi
+
+  omarchy-brightness-display --no-osd --monitor "$monitor" "${target}%" >/dev/null 2>&1
+}
+
+# -------------------------------------------------------------------- entry
+
+if (($# == 0)); then
+  list_targets
+  exit 0
+fi
+
+(($# >= 2)) || {
+  echo "usage: before-sunset-brightness [<id> <percent> [down|up|both]]" >&2
+  exit 1
+}
+
+id=$1
+target=$2
+direction=${3:-both}
+
+[[ $target =~ ^[0-9]+$ ]] || {
+  echo "usage: before-sunset-brightness [<id> <percent> [down|up|both]]" >&2
+  exit 1
+}
+
+((target >= FLOOR)) || target=$FLOOR
+((target <= 100)) || target=100
+
+set_target "$id" "$target" "$direction"

@@ -183,6 +183,59 @@ Panel {
     return next
   }
 
+  readonly property int nightBrightness: service ? service.nightBrightness : -1
+  readonly property int dayBrightness: service ? service.dayBrightness : -1
+  readonly property var brightnessTargets: service && service.brightnessTargets ? service.brightnessTargets : []
+  readonly property var brightnessOverrides: service && service.brightnessOverrides ? service.brightnessOverrides : ({})
+  readonly property bool brightnessAvailable: service ? service.brightnessAvailable === true : false
+
+  function brightnessLevelOf(value) {
+    if (value === undefined || value === null || value === "") return -1
+    var parsed = parseInt(value, 10)
+    return isNaN(parsed) || parsed < 0 || parsed > 100 ? -1 : parsed
+  }
+
+  function brightnessConfig(changes) {
+    var next = ({
+      night: nightBrightness < 0 ? null : nightBrightness,
+      day: dayBrightness < 0 ? null : dayBrightness,
+      displays: brightnessOverrides
+    })
+    for (var change in changes) next[change] = changes[change]
+    return next
+  }
+
+  // Overrides are rewritten whole, and a display that is not on screen keeps
+  // its entry: the list below is what answered this minute, the file is every
+  // display that ever did. Unplugging a monitor should not forget its numbers.
+  function brightnessDisplays(id, changes) {
+    var next = ({})
+    for (var key in brightnessOverrides) next[key] = brightnessOverrides[key]
+
+    if (changes === null) {
+      delete next[id]
+      return next
+    }
+
+    var own = ({})
+    if (next[id]) for (var field in next[id]) own[field] = next[id][field]
+    for (var change in changes) own[change] = changes[change]
+    next[id] = own
+    return next
+  }
+
+  function brightnessOverrideFor(id) {
+    return brightnessOverrides && brightnessOverrides[id] ? brightnessOverrides[id] : null
+  }
+
+  readonly property string brightnessSummary: {
+    if (!brightnessAvailable) return "No display answers"
+    if (nightBrightness < 0 && dayBrightness < 0) return "Off"
+    if (nightBrightness >= 0 && dayBrightness >= 0) return "Night " + nightBrightness + "% · day " + dayBrightness + "%"
+    if (nightBrightness >= 0) return "Night · " + nightBrightness + "%"
+    return "Day · " + dayBrightness + "%"
+  }
+
   readonly property string volumeSummary: {
     if (nightVolume < 0 && dayVolume < 0) return "Off"
     if (nightVolume >= 0 && dayVolume >= 0) return "Night " + nightVolume + "% · day " + dayVolume + "%"
@@ -1566,6 +1619,222 @@ Panel {
               width: parent.width
               text: "Shares the night light with Omarchy's own toggle: switching it on there "
                 + "hands the schedule the wheel, switching it off takes it back."
+              color: root.dim
+              font.family: root.face
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.WordWrap
+            }
+          }
+
+          PanelSeparator { foreground: root.fg }
+
+          // ------------------------------------------------ brightness
+
+          Disclosure {
+            title: "BRIGHTNESS"
+            summary: root.brightnessSummary
+            // Nothing is drawn on a machine where no display answers, the same
+            // way the light sensor is absent rather than greyed out.
+            visible: root.brightnessAvailable
+
+            Item {
+              width: parent.width
+              height: Math.max(dimLabel.height, dimSwitch.height)
+
+              Text {
+                id: dimLabel
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Dim at nightfall"
+                color: root.dim
+                font.family: root.face
+                font.pixelSize: Style.font.caption
+              }
+
+              ToggleSwitch {
+                id: dimSwitch
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                checked: root.nightBrightness >= 0
+                foreground: root.fg
+                onToggled: root.persist({ brightness: root.brightnessConfig({ night: root.nightBrightness >= 0 ? null : 40 }) })
+              }
+            }
+
+            NumberField {
+              visible: root.nightBrightness >= 0
+              label: "Night level %"
+              value: Math.max(0, root.nightBrightness)
+              from: 5
+              to: 100
+              stepSize: 5
+              foreground: root.fg
+              fontFamily: root.face
+              onModified: function(value) { root.persist({ brightness: root.brightnessConfig({ night: value }) }) }
+            }
+
+            Item {
+              width: parent.width
+              height: Math.max(liftLabel.height, liftSwitch.height)
+
+              Text {
+                id: liftLabel
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Brighten at daybreak"
+                color: root.dim
+                font.family: root.face
+                font.pixelSize: Style.font.caption
+              }
+
+              ToggleSwitch {
+                id: liftSwitch
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                checked: root.dayBrightness >= 0
+                foreground: root.fg
+                onToggled: root.persist({ brightness: root.brightnessConfig({ day: root.dayBrightness >= 0 ? null : 80 }) })
+              }
+            }
+
+            NumberField {
+              visible: root.dayBrightness >= 0
+              label: "Day level %"
+              value: Math.max(0, root.dayBrightness)
+              from: 5
+              to: 100
+              stepSize: 5
+              foreground: root.fg
+              fontFamily: root.face
+              onModified: function(value) { root.persist({ brightness: root.brightnessConfig({ day: value }) }) }
+            }
+
+            // Folded away, because one pair of numbers is the whole setting for
+            // most people and a list of displays would be the first thing they
+            // had to read past to find it.
+            Disclosure {
+              title: "Per display"
+              summary: root.brightnessTargets.length + (root.brightnessTargets.length === 1 ? " display" : " displays")
+
+              Repeater {
+                model: root.brightnessTargets
+
+                Column {
+                  id: displayRow
+
+                  required property var modelData
+
+                  readonly property string targetId: String(displayRow.modelData.id || "")
+                  readonly property var own: root.brightnessOverrideFor(displayRow.targetId)
+                  readonly property bool overridden: displayRow.own !== null
+                  readonly property int ownNight: root.brightnessLevelOf(displayRow.own ? displayRow.own.night : undefined)
+                  readonly property int ownDay: root.brightnessLevelOf(displayRow.own ? displayRow.own.day : undefined)
+
+                  width: parent.width
+                  spacing: Style.space(8)
+
+                  Item {
+                    width: parent.width
+                    height: Math.max(displayLabel.height, displaySwitch.height)
+
+                    Column {
+                      id: displayLabel
+                      anchors.left: parent.left
+                      anchors.right: displaySwitch.left
+                      anchors.rightMargin: Style.space(8)
+                      anchors.verticalCenter: parent.verticalCenter
+
+                      Text {
+                        width: parent.width
+                        text: String(displayRow.modelData.label || "Display")
+                        color: root.fg
+                        font.family: root.face
+                        font.pixelSize: Style.font.caption
+                        elide: Text.ElideRight
+                      }
+
+                      Text {
+                        width: parent.width
+                        // The live reading is what tells two identical displays
+                        // apart. Apple's have no connector to name them by, so
+                        // the number they are sitting at is the only handle.
+                        text: (displayRow.overridden ? "Its own numbers" : "Follows the pair above")
+                          + " · now " + displayRow.modelData.value + "%"
+                        color: root.dim
+                        font.family: root.face
+                        font.pixelSize: Style.font.caption
+                        elide: Text.ElideRight
+                      }
+                    }
+
+                    ToggleSwitch {
+                      id: displaySwitch
+                      anchors.right: parent.right
+                      anchors.verticalCenter: parent.verticalCenter
+                      checked: displayRow.overridden
+                      foreground: root.fg
+                      // Taking a display off the pair starts it on the pair's
+                      // own numbers, so the switch itself never changes what
+                      // the screen does — only what moves it next time.
+                      onToggled: root.persist({ brightness: root.brightnessConfig({
+                        displays: root.brightnessDisplays(displayRow.targetId, displayRow.overridden ? null : ({
+                          night: root.nightBrightness < 0 ? null : root.nightBrightness,
+                          day: root.dayBrightness < 0 ? null : root.dayBrightness
+                        }))
+                      }) })
+                    }
+                  }
+
+                  Row {
+                    visible: displayRow.overridden
+                    width: parent.width
+                    spacing: Style.space(12)
+
+                    NumberField {
+                      label: "Night %"
+                      value: Math.max(0, displayRow.ownNight)
+                      from: 5
+                      to: 100
+                      stepSize: 5
+                      foreground: root.fg
+                      fontFamily: root.face
+                      onModified: function(value) { root.persist({ brightness: root.brightnessConfig({
+                        displays: root.brightnessDisplays(displayRow.targetId, { night: value })
+                      }) }) }
+                    }
+
+                    NumberField {
+                      label: "Day %"
+                      value: Math.max(0, displayRow.ownDay)
+                      from: 5
+                      to: 100
+                      stepSize: 5
+                      foreground: root.fg
+                      fontFamily: root.face
+                      onModified: function(value) { root.persist({ brightness: root.brightnessConfig({
+                        displays: root.brightnessDisplays(displayRow.targetId, { day: value })
+                      }) }) }
+                    }
+                  }
+                }
+              }
+            }
+
+            Text {
+              width: parent.width
+              text: "Only the sun and fixed hours move the brightness, and only when they "
+                + "turn the day over. Night never raises it and day never lowers it, so a "
+                + "screen you turned down yourself stays where you put it."
+              color: root.dim
+              font.family: root.face
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.WordWrap
+            }
+
+            Text {
+              width: parent.width
+              text: "Displays that cannot be driven are not listed. A monitor with no DDC, "
+                + "or one whose firmware refuses, is left alone rather than reported broken."
               color: root.dim
               font.family: root.face
               font.pixelSize: Style.font.caption

@@ -353,6 +353,62 @@ hardware is honoured rather than bypassed.
 
 ![The volume section](docs/volume.png)
 
+## Dimming the screens at night
+
+The same idea as the volume, pointed at the displays. Give the plugin a night
+level and a day level and every screen that can be driven moves to them when
+the schedule turns the day over.
+
+The rules are the same one-directional ones. Night dims and never brightens;
+day brightens and never dims. A screen you turned down yourself in the middle
+of the afternoon is still where you left it at dusk, because dusk only ever
+moves a screen further down. There is a floor of a few percent under every
+target: a screen at zero is a screen nobody can find the setting on again.
+
+Only the sun and fixed hours move it, and only at the turn of the day — not
+when you pin a half, and never under the light sensor.
+
+No notification is sent. This is the one change on the schedule nobody can fail
+to notice, and announcing it would be telling you what you are looking at.
+
+### One pair of numbers, and overrides if you want them
+
+Most setups want one night level and one day level for everything, so that is
+what the section shows. **Per display** folds open a row for each display that
+answered, each starting on the pair above; taking one off the pair starts it on
+the numbers it already had, so the switch itself never changes what the screen
+is doing — only what moves it next time.
+
+A display keeps its numbers while it is unplugged. The list is what answered
+this minute; the file remembers every display that ever did, keyed by its EDID
+serial rather than its connector, because `DP-1` and `DP-2` trade places the
+moment two cables do.
+
+### What can and cannot be driven
+
+Three mechanisms, and Omarchy already knows which display wants which:
+`brightnessctl` for a laptop's own panel, DDC/CI for most external monitors,
+and `asdcontrol` for Apple's. The first two go through
+`omarchy-brightness-display`, the same command the brightness keys use.
+
+Apple's displays are driven directly, for the same reason the night light
+drives `hyprsunset` rather than Omarchy's toggle: the command cannot do what is
+needed here. `omarchy-brightness-display --monitor DP-2` accepts the monitor
+name and then hands the work to a helper that ignores it, driving whichever
+Apple display it detected first. With two of them connected, every write lands
+on the same panel and the other never moves. Addressing the devices ourselves
+is the only way both of them dim.
+
+Which Apple display is on which connector, though, is not knowable — a
+display's EDID serial and its USB serial have nothing in common — so they are
+listed as displays in their own right rather than being tied to a monitor. The
+live reading in each row is what tells two identical panels apart.
+
+A display that answers nothing is not listed and not reported: a monitor with
+no DDC, or one whose firmware refuses the brightness code, is left alone. Where
+no display answers at all, the section is not drawn, the same way the light
+sensor is absent on machines that have none.
+
 ## Backgrounds are remembered per theme
 
 `omarchy theme set` picks a theme's *first* background whenever it enters that
@@ -523,6 +579,7 @@ bin/before-sunset-slot      resolve a slot's preview and wallpaper for the panel
 bin/before-sunset-sensor    read the ambient light sensor, if there is one
 bin/before-sunset-volume    ease the output volume to a level over a few seconds
 bin/before-sunset-nightlight  read or set the screen colour temperature
+bin/before-sunset-brightness  list the displays that can be dimmed, and dim one
 bin/before-sunset-wake      report each resume from suspend, so the theme can catch up at once
 ```
 
@@ -533,9 +590,15 @@ A stock Omarchy 4. Nothing to install.
 The plugin shells out only to `bash`, `jq`, coreutils, and Omarchy's own
 commands — `omarchy-theme-set`, `omarchy-theme-bg-set`, `omarchy-theme-color`,
 `omarchy-theme-switcher`, `omarchy-menu-images`, `omarchy-audio-output-sink`,
-`omarchy-notification-send` — plus `pactl` for the volume fade, `hyprctl`
-for the night light, and `gdbus` for the resume announcement, all part of a
-base install. It makes no network requests: sunrise and sunset
+`omarchy-notification-send`, `omarchy-brightness-display` — plus `pactl` for
+the volume fade, `hyprctl` for the night light and the monitor list, `gdbus`
+for the resume announcement, and `udevadm` to tell two identical displays
+apart, all part of a base install.
+
+Brightness on Apple's displays goes through `asdcontrol`, which Omarchy ships
+in its base packages along with the `/etc/sudoers.d` rule that lets it run
+without a password. Where that rule is absent the displays simply do not appear
+in the list, and nothing prompts. It makes no network requests: sunrise and sunset
 are arithmetic, not an API call.
 
 It listens on the system bus for logind's resume announcement, which is a
