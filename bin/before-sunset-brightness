@@ -23,6 +23,7 @@
 # Usage:
 #   before-sunset-brightness                       list targets as JSON
 #   before-sunset-brightness <id> <percent> [down|up|both]
+#   before-sunset-brightness --ramp <seconds> <down|up> <id> <percent>...
 #
 #   down  act only if the display is brighter than the target (the dusk case)
 #   up    act only if it is dimmer (the dawn one)
@@ -178,31 +179,63 @@ resolve_apple_device() {
   return 1
 }
 
-set_target() {
-  local id=$1 target=$2 direction=$3
-  local current="" monitor="" device=""
+internal_monitor() {
+  monitors_json | jq -r '.[] | select(.name | test("^(eDP|LVDS|DSI)-")) | .name' | head -n1
+}
+
+read_percent() {
+  local id=$1 monitor device
 
   case "$id" in
   panel)
-    monitor=$(monitors_json | jq -r '.[] | select(.name | test("^(eDP|LVDS|DSI)-")) | .name' | head -n1)
+    monitor=$(internal_monitor)
     [[ -n $monitor ]] || return 1
-    current=$(omarchy-brightness-display --monitor "$monitor" 2>/dev/null)
+    omarchy-brightness-display --monitor "$monitor" 2>/dev/null
     ;;
   ddc:*)
     monitor=$(resolve_monitor "${id#ddc:}") || return 1
     [[ -n $monitor ]] || return 1
-    current=$(omarchy-brightness-display-ddc "$monitor" 2>/dev/null)
+    omarchy-brightness-display-ddc "$monitor" 2>/dev/null
     ;;
   apple:*)
     device=$(resolve_apple_device "${id#apple:}") || return 1
-    current=$(apple_percent "$device") || return 1
+    apple_percent "$device"
     ;;
   *)
-    echo "unknown target: $id" >&2
+    return 1
+    ;;
+  esac
+}
+
+write_percent() {
+  local id=$1 target=$2 monitor device
+
+  case "$id" in
+  panel)
+    monitor=$(internal_monitor)
+    [[ -n $monitor ]] || return 1
+    ;;
+  ddc:*)
+    monitor=$(resolve_monitor "${id#ddc:}") || return 1
+    [[ -n $monitor ]] || return 1
+    ;;
+  apple:*)
+    device=$(resolve_apple_device "${id#apple:}") || return 1
+    sudo -n asdcontrol "$device" -- "${target}%" >/dev/null 2>&1
+    return
+    ;;
+  *)
     return 1
     ;;
   esac
 
+  omarchy-brightness-display --no-osd --monitor "$monitor" "${target}%" >/dev/null 2>&1
+}
+
+set_target() {
+  local id=$1 target=$2 direction=$3 current
+
+  current=$(read_percent "$id") || return 1
   [[ $current =~ ^[0-9]+$ ]] || return 1
 
   # The whole point of the direction: dusk may only darken and dawn may only
@@ -215,18 +248,254 @@ set_target() {
 
   ((current != target)) || return 0
 
-  if [[ -n $device ]]; then
-    sudo -n asdcontrol "$device" -- "${target}%" >/dev/null 2>&1
-    return
+  write_percent "$id" "$target"
+}
+
+# --------------------------------------------------------------------- ramp
+
+# A hardware brightness change is a step: DDC and asdcontrol take one value and
+# the screen is simply at it. Stepping the whole desktop at dusk is exactly the
+# thing this plugin exists not to do — but writing a hundred intermediate values
+# is worse. DDC brightness lives in the monitor's own memory, and some panels
+# have a finite number of writes in them; a ramp per turn, twice a day, for
+# years, is not a thing to spend them on.
+#
+# So the ramp happens in software and the hardware moves once. hyprsunset holds
+# a gamma table for every output and takes a percentage over the same hyprctl
+# socket the night light already uses, which costs about four milliseconds and
+# nothing at all in the monitor.
+#
+#   Dusk:  gamma slides 100% down to target/current, and at the bottom the
+#          hardware takes the real value while gamma goes back to 100%.
+#   Dawn:  gamma drops to current/target and the hardware takes the real value
+#          in the same breath — the two cancel, so nothing jumps — and then
+#          gamma slides back up to 100%.
+#
+# Both swaps are ordered so the gap between the two writes reads as a momentary
+# dip rather than a flash. A screen that darkens for a frame is missable; a
+# screen that flares is not.
+#
+# Gamma is global — hyprsunset holds one table for the whole session, with no
+# per-output switch in 0.4.0 — so with several displays the slide follows the
+# shallowest of them. Nothing is ever darker on the way than it will be at the
+# end, and the deeper targets finish their fall in the hardware step, which is
+# the direction they were going anyway.
+
+GAMMA_FLOOR=5
+
+gamma_read() {
+  hyprctl hyprsunset gamma 2>/dev/null | grep -oE '^[0-9]+' | head -n1
+}
+
+gamma_write() {
+  hyprctl hyprsunset gamma "$1" >/dev/null 2>&1
+}
+
+# What we last wrote, so our own dim can be told from somebody else's.
+owned_gamma=-1
+
+# Global, because the EXIT trap reads it after the frame that would have held it
+# is gone — and under `set -u` an unset name there takes the trap down with it,
+# which is precisely when the screen is still dimmed.
+lock="${XDG_RUNTIME_DIR:-/tmp}/before-sunset-brightness.pid"
+
+release_gamma() {
+  ((owned_gamma >= 0)) || return 0
+
+  local now
+  now=$(gamma_read)
+  owned_gamma_was=$owned_gamma
+  owned_gamma=-1
+
+  # Only put it back if it is still where we left it. Anyone else driving gamma
+  # now owns it, and stamping 100 over their setting on the way out would be the
+  # rudest possible exit.
+  [[ $now =~ ^[0-9]+$ ]] || return 0
+  ((now >= owned_gamma_was - 3 && now <= owned_gamma_was + 3)) || return 0
+
+  gamma_write 100
+}
+
+ramp_ids=()
+ramp_targets=()
+ramp_currents=()
+
+# 0 finished, 1 gamma taken by somebody else, 2 a display moved under us.
+#
+# Driven by the clock rather than by a step count. Every step costs a hyprctl
+# round trip, and reading two displays back over USB costs several more, so a
+# fixed sleep per step made a four-second fade take eight. The value is
+# interpolated from how much of the window has actually gone, which means a slow
+# machine draws the same slide in fewer stops rather than taking twice as long
+# over it.
+fade_gamma() {
+  local from=$1 to=$2 seconds=$3
+  local started now elapsed span value seen index
+  local last=$from ticks=0
+
+  span=$((seconds * 1000000000))
+  ((span > 0)) || span=1
+  started=$(date +%s%N)
+
+  while :; do
+    now=$(date +%s%N)
+    elapsed=$((now - started))
+    ((elapsed < span)) || break
+
+    value=$((from + (to - from) * elapsed / span))
+    if ((value != last)); then
+      gamma_write "$value"
+      owned_gamma=$value
+      last=$value
+    fi
+
+    sleep 0.2
+    ((ticks++))
+
+    # Both checks cost a round trip, so neither runs every tick. Gamma is asked
+    # about once a second; the displays every two, because someone reaching for
+    # the brightness keys is not going to do it faster than that, and asking
+    # them over USB four times a second would cost more than the ramp.
+    if ((ticks % 5 == 0)); then
+      seen=$(gamma_read)
+      if [[ $seen =~ ^[0-9]+$ ]] && ((seen < last - 3 || seen > last + 3)); then
+        owned_gamma=-1
+        return 1
+      fi
+    fi
+
+    if ((ticks % 10 == 0)); then
+      for index in "${!ramp_ids[@]}"; do
+        seen=$(read_percent "${ramp_ids[$index]}") || continue
+        [[ $seen =~ ^[0-9]+$ ]] || continue
+        if ((seen < ramp_currents[index] - 2 || seen > ramp_currents[index] + 2)); then
+          return 2
+        fi
+      done
+    fi
+  done
+
+  gamma_write "$to"
+  owned_gamma=$to
+  return 0
+}
+
+land_hardware() {
+  local index
+  for index in "${!ramp_ids[@]}"; do
+    write_percent "${ramp_ids[$index]}" "${ramp_targets[$index]}"
+  done
+}
+
+ramp() {
+  local seconds=$1 direction=$2
+  shift 2
+
+  local id want current
+  while (($# >= 2)); do
+    id=$1
+    want=$2
+    shift 2
+
+    [[ $want =~ ^[0-9]+$ ]] || continue
+    ((want >= FLOOR)) || want=$FLOOR
+    ((want <= 100)) || want=100
+
+    current=$(read_percent "$id") || continue
+    [[ $current =~ ^[0-9]+$ ]] || continue
+
+    case "$direction" in
+    down) ((current > want)) || continue ;;
+    up) ((current < want)) || continue ;;
+    esac
+
+    ramp_ids+=("$id")
+    ramp_targets+=("$want")
+    ramp_currents+=("$current")
+  done
+
+  ((${#ramp_ids[@]} > 0)) || return 0
+
+  # One ramp at a time. A dawn arriving on top of a dusk should replace it, not
+  # race it across the same gamma table.
+  if [[ -r $lock ]]; then
+    local previous
+    previous=$(cat "$lock" 2>/dev/null)
+    if [[ $previous =~ ^[0-9]+$ ]] && kill -0 "$previous" 2>/dev/null; then
+      kill "$previous" 2>/dev/null
+      # Let its own exit put gamma back before we read it, or we would take its
+      # half-finished dim for the resting state and ramp from there.
+      local waited=0
+      while kill -0 "$previous" 2>/dev/null && ((waited < 20)); do
+        sleep 0.1
+        ((waited++))
+      done
+      sleep 0.2
+    fi
+  fi
+  echo $$ >"$lock"
+
+  local index ratio gamma=0
+  for index in "${!ramp_ids[@]}"; do
+    if [[ $direction == up ]]; then
+      ratio=$((ramp_currents[index] * 100 / ramp_targets[index]))
+    else
+      ratio=$((ramp_targets[index] * 100 / ramp_currents[index]))
+    fi
+    ((ratio < GAMMA_FLOOR)) && ratio=$GAMMA_FLOOR
+    ((ratio > 100)) && ratio=100
+    ((ratio > gamma)) && gamma=$ratio
+  done
+
+  local resting
+  resting=$(gamma_read)
+
+  # No ramp is possible, or none is worth doing: no hyprsunset behind the
+  # socket, gamma already held below full by something else, or a slide too
+  # shallow to see. The step is still owed either way.
+  if ((seconds <= 0)) || ((gamma >= 98)) ||
+    [[ ! $resting =~ ^[0-9]+$ ]] || ((resting < 98)); then
+    land_hardware
+    rm -f "$lock"
+    return 0
   fi
 
-  omarchy-brightness-display --no-osd --monitor "$monitor" "${target}%" >/dev/null 2>&1
+  trap 'release_gamma; rm -f "$lock"' EXIT INT TERM
+
+  if [[ $direction == down ]]; then
+    fade_gamma 100 "$gamma" "$seconds"
+    case $? in
+    2) return 0 ;;
+    esac
+    land_hardware
+    release_gamma
+  else
+    owned_gamma=$gamma
+    gamma_write "$gamma"
+    land_hardware
+    fade_gamma "$gamma" 100 "$seconds"
+    ((owned_gamma < 0)) || { gamma_write 100; owned_gamma=-1; }
+  fi
 }
 
 # -------------------------------------------------------------------- entry
 
 if (($# == 0)); then
   list_targets
+  exit 0
+fi
+
+if [[ $1 == "--ramp" ]]; then
+  shift
+  (($# >= 4)) || {
+    echo "usage: before-sunset-brightness --ramp <seconds> <down|up> <id> <percent>..." >&2
+    exit 1
+  }
+  seconds=$1
+  direction=$2
+  shift 2
+  [[ $seconds =~ ^[0-9]+$ ]] || seconds=0
+  ramp "$seconds" "$direction" "$@"
   exit 0
 fi
 

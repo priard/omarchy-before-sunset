@@ -1,5 +1,7 @@
 # Before Sunset
 
+**Version 0.7.2** · [what changed](CHANGELOG.md)
+
 Follow the sun: one Omarchy theme through the day, another through the night,
 each with its own wallpaper and its own answer to whether the top bar should be
 transparent.
@@ -392,6 +394,38 @@ target: a screen at zero is a screen nobody can find the setting on again.
 Only the sun and fixed hours move it, and only at the turn of the day. Pinning a
 half stops it until Auto takes over, and the light sensor never moves it at all.
 
+### The slide happens in software
+
+A hardware brightness change is a step: DDC and `asdcontrol` take one value and
+the screen is at it. Stepping the whole desktop at dusk is the thing this plugin
+exists not to do — but writing a hundred intermediate values is worse, because
+DDC brightness lives in the monitor's own memory and some panels have a finite
+number of writes in them.
+
+So the slide is drawn in gamma and the hardware moves once. `hyprsunset` already
+holds a gamma table for every output — it is what the night light drives — and
+takes a percentage over the same socket, which costs about four milliseconds and
+nothing at all in the monitor.
+
+At dusk gamma slides down to the ratio between where a screen is and where it is
+going, and at the bottom the hardware takes the real value while gamma returns
+to full. At dawn the two happen together — gamma drops by exactly as much as the
+hardware rises, so nothing jumps — and then gamma slides back up. Both swaps are
+ordered so the gap between the two writes reads as a momentary dip rather than a
+flash: a screen that darkens for a frame is missable, a screen that flares is
+not.
+
+Gamma is one table for the whole session, with no per-output switch, so with
+several displays the slide follows the shallowest of them. Nothing is ever
+darker on the way than it will be at the end, and the deeper targets finish
+falling in the hardware step, which is the direction they were going anyway.
+
+The fade is driven by the clock rather than by a step count, so it takes the
+number of seconds it was given whatever the machine costs per write. Reach for
+the brightness keys while it is running and it stops: you have an opinion about
+the brightness, which outranks the schedule's. Set the fade to zero, or run
+without `hyprsunset`, and the hardware simply steps as it did before.
+
 No notification is sent. This is the one change on the schedule nobody can fail
 to notice, and announcing it would be telling you what you are looking at.
 
@@ -636,6 +670,10 @@ places: its own entry in `~/.config/omarchy/shell.json`, and
 wallpaper calls for it.
 
 ## Development
+
+The version is written in three places and they are expected to agree:
+`manifest.json`, the heading at the top of this file, and the newest section of
+[CHANGELOG.md](CHANGELOG.md).
 
 Saving a file under `~/.config/omarchy/plugins/` logs a plugin reload, but a
 running service instance keeps its old code and its IPC target, and a mounted

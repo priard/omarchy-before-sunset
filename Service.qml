@@ -589,6 +589,11 @@ Item {
   readonly property int nightBrightness: brightnessLevel(brightnessSettings ? brightnessSettings.night : undefined)
   readonly property int dayBrightness: brightnessLevel(brightnessSettings ? brightnessSettings.day : undefined)
 
+  readonly property int brightnessFadeSeconds: {
+    var value = brightnessSettings ? parseInt(brightnessSettings.fadeSeconds, 10) : NaN
+    return isNaN(value) || value < 0 ? 20 : Math.min(300, value)
+  }
+
   readonly property var brightnessOverrides: {
     var value = brightnessSettings ? brightnessSettings.displays : null
     return value && typeof value === "object" ? value : ({})
@@ -611,7 +616,17 @@ Item {
     return side === "night" ? nightBrightness : dayBrightness
   }
 
+  // Every display goes in one call rather than one call each. The slide is drawn
+  // in gamma, and gamma is one table for the whole session — two ramps running
+  // at once would be two hands on the same dial.
   function applyBrightnessFor(newSide) {
+    var command = [
+      pluginFile("bin/before-sunset-brightness"),
+      "--ramp",
+      String(brightnessFadeSeconds),
+      newSide === "night" ? "down" : "up"
+    ]
+
     var moved = false
 
     for (var i = 0; i < brightnessTargets.length; i++) {
@@ -621,29 +636,29 @@ Item {
       var level = brightnessFor(id, newSide)
       if (level < 0) continue
 
-      // Detached, like the volume fade: a DDC write can sit for a second
-      // waiting on the monitor's firmware, and a display that never answers
-      // must not hold up the one next to it.
-      Quickshell.execDetached([
-        pluginFile("bin/before-sunset-brightness"),
-        id,
-        String(level),
-        newSide === "night" ? "down" : "up"
-      ])
+      command.push(id)
+      command.push(String(level))
       moved = true
     }
+
+    if (!moved) return
+
+    // Detached, like the volume fade: the ramp outlives the call by design and
+    // the script serialises overlapping runs through its own lock.
+    Quickshell.execDetached(command)
 
     // No notification. This is the one thing on the schedule nobody can fail to
     // notice, and saying so in a popup would be telling someone what they are
     // looking at.
-    if (moved) brightnessSettle.restart()
+    brightnessSettle.restart()
   }
 
-  // The writes are detached and land at their own pace; the panel's numbers are
-  // re-read once they have had time to.
+  // The panel's numbers are re-read once the ramp has finished, not while it is
+  // still sliding: mid-ramp the hardware has not moved yet and the reading would
+  // be the old one presented as the new.
   Timer {
     id: brightnessSettle
-    interval: 3000
+    interval: (root.brightnessFadeSeconds + 3) * 1000
     onTriggered: root.probeBrightness()
   }
 
@@ -1662,6 +1677,7 @@ Item {
         brightness: {
           night: root.nightBrightness,
           day: root.dayBrightness,
+          fadeSeconds: root.brightnessFadeSeconds,
           displays: root.brightnessTargets,
           overrides: root.brightnessOverrides
         },

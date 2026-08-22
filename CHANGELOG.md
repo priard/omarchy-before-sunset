@@ -5,6 +5,47 @@ Notable changes to Before Sunset.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2026-08-22
+
+### Added
+
+- **The screens slide rather than step.** A hardware brightness change is a
+  step: DDC and `asdcontrol` take one value and the screen is at it. Stepping
+  the whole desktop at dusk is the thing this plugin exists not to do — but
+  writing a hundred intermediate values is worse, because DDC brightness lives
+  in the monitor's own memory and some panels have a finite number of writes in
+  them.
+
+  So the slide is drawn in gamma and the hardware moves once. `hyprsunset`
+  already holds a gamma table for every output — it is what the night light
+  drives — and takes a percentage over the same socket, at about four
+  milliseconds a write and nothing at all in the monitor.
+
+  At dusk gamma slides down to the ratio between where a screen is and where it
+  is going, and at the bottom the hardware takes the real value while gamma
+  returns to full. At dawn the two happen together, so nothing jumps, and gamma
+  slides back up afterwards. Both swaps are ordered so the gap reads as a
+  momentary dip rather than a flash.
+
+  Gamma is one table for the whole session, so with several displays the slide
+  follows the shallowest of them: nothing is ever darker on the way than it will
+  be at the end.
+
+  The fade is clock-driven rather than counted in steps, so it takes the seconds
+  it was given whatever the machine costs per write — the first draft asked for
+  four seconds and took eight. Touch the brightness keys mid-slide and it stops.
+  Without `hyprsunset`, or with the fade set to zero, the hardware steps exactly
+  as it did in 0.7.0.
+
+- **A Fade (s) field**, beside the night level, where the volume has had one all
+  along.
+
+### Changed
+
+- **The readme says which version it is**, at the top, next to a link to this
+  file. It is the third place the number lives, and the three are expected to
+  agree.
+
 ## [0.7.1] - 2026-08-22
 
 ### Added
