@@ -264,7 +264,11 @@ Three modes, and they are its own, not the theme's:
 Keeping this separate from the theme's mode matters: pinning a theme to Day
 says something about colours on screen, not about whether your eyes want a
 warmer picture at midnight. The schedule is computed either way, so the night
-light — and the night volume — keep working while a theme is pinned.
+light — and the brightness, and the volume — keep working while a theme is
+pinned. Only turning the plugin off stops all of it.
+
+The panel says so rather than hiding the evidence: pin a half and the schedule
+section stays on screen, dimmed, still showing the day it is still keeping.
 
 ### Its own hours, if you want them
 

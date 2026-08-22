@@ -969,10 +969,16 @@ Panel {
     property string summary: ""
     property bool expanded: false
 
+    // Quieter, not disabled. A section can stop driving the thing it is named
+    // after and still be worth reading and worth changing — the schedule while
+    // a theme is pinned is exactly that, so it dims rather than greying out.
+    property bool muted: false
+
     default property alias body: holder.children
 
     width: parent.width
     spacing: Style.space(12)
+    opacity: disclosure.muted ? 0.55 : 1
 
     Item {
       width: parent.width
@@ -1160,7 +1166,8 @@ Panel {
             Text {
               visible: root.configMode === "day" || root.configMode === "night"
               width: parent.width
-              text: "Pinned. The schedule is not running; switch to Auto to follow it again."
+              text: "Pinned. The theme is not following the schedule; switch to Auto to "
+                + "hand it back."
               color: root.dim
               font.family: root.face
               font.pixelSize: Style.font.caption
@@ -1194,14 +1201,33 @@ Panel {
             }
           }
 
-          PanelSeparator { foreground: root.fg }
+          PanelSeparator { foreground: root.fg; visible: scheduleSection.visible }
 
           // -------------------------------------------------- schedule
 
           Disclosure {
-            visible: root.configMode === "auto"
+            id: scheduleSection
+
+            // Off is the only mode where the schedule genuinely stops. Pinned,
+            // it still runs — it just is not the thing repainting the desktop —
+            // so it stays on screen and says so rather than disappearing and
+            // taking its own explanation with it.
+            visible: root.configMode !== "off"
+            muted: root.configMode !== "auto"
             title: "SCHEDULE"
             summary: root.scheduleSummary
+
+            Text {
+              visible: root.configMode === "day" || root.configMode === "night"
+              width: parent.width
+              text: "Pinned, so the theme is not following this. The night light, the "
+                + "brightness and the volume still are: the day still turns, it just "
+                + "does not repaint anything."
+              color: root.dim
+              font.family: root.face
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.WordWrap
+            }
 
             ButtonGroup {
               visible: root.hasLocation || root.sensorAvailable
@@ -1626,11 +1652,13 @@ Panel {
             }
           }
 
-          PanelSeparator { foreground: root.fg }
+          PanelSeparator { foreground: root.fg; visible: brightnessSection.visible }
 
           // ------------------------------------------------ brightness
 
           Disclosure {
+            id: brightnessSection
+
             title: "BRIGHTNESS"
             summary: root.brightnessSummary
             // Nothing is drawn on a machine where no display answers, the same

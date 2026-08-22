@@ -30,6 +30,18 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
   No notification: this is the one scheduled change nobody can fail to notice.
 
+### Changed
+
+- **A pinned theme dims the schedule instead of hiding it.** Pinning Day or
+  Night removed the whole section, which left two separators stacked with a gap
+  between them — and told a lie on the way out. The schedule keeps running
+  while a theme is pinned: the night light, the brightness and the volume all
+  still follow it, and only turning the plugin off stops any of that. So the
+  section stays, dimmed and still adjustable, and says what it is still driving.
+
+  The line under the mode buttons said "the schedule is not running", which was
+  the same lie in fewer words. It now says the theme is not following it.
+
 - **Apple's displays are driven per device.** `omarchy-brightness-display
   --monitor DP-2` takes the monitor name and then hands the work to a helper
   that ignores it, driving whichever Apple display it detected first. With two
