@@ -320,12 +320,12 @@ Panel {
   }
 
   // Other Omarchy panels put a rotating line where a status would be redundant,
-  // and this one has the same spare room: "DAY UNTIL 19:50" repeats a number the
-  // schedule section is already showing. So the meta alternates — the fact, then
-  // a phrase, then the fact again, so it is never more than one beat away.
+  // and under the heading is that place — as long as the fact it was carrying
+  // has somewhere better to be. It does: the corner of the heading row, in a
+  // pill, where it can be read at any moment rather than waited for.
   //
-  // Every one of them is true of what the plugin is actually doing, which is the
-  // only rule they follow. Nothing here is bending light.
+  // Every phrase is true of what the plugin is actually doing, which is the only
+  // rule they follow. Nothing here is bending light.
   readonly property var idlePhrases: [
     "Watching the sky",
     "Consulting the almanac",
@@ -337,11 +337,29 @@ Panel {
   ]
 
   property int phraseIndex: 0
-  property bool showingPhrase: false
 
-  readonly property string heroLine: showingPhrase && idlePhrases.length > 0
-    ? idlePhrases[phraseIndex % idlePhrases.length]
-    : heroMeta
+  // The badge is the terse version, because it sits beside a title and has to
+  // leave room for it. The full sentence stays on the bar widget's tooltip.
+  readonly property string heroBadge: {
+    if (!service) return "NO SERVICE"
+    if (!service.configured) return "SETTING UP"
+    if (configMode === "off") return "OFF"
+    if (configMode === "day" || configMode === "night") return "PINNED · " + configMode.toUpperCase()
+    if (side === "") return "AUTO"
+    return side.toUpperCase() + (nextTransition ? " · " + clockOf(nextTransition) : "")
+  }
+
+  // Nothing rotates outside Auto: holding a half is a state worth naming once,
+  // and a line that keeps changing under a pinned desktop would suggest the
+  // plugin is up to something it is deliberately not up to.
+  readonly property string heroLine: {
+    if (!service) return ""
+    if (!service.configured) return "Choosing the slots"
+    if (configMode === "off") return "Standing by"
+    if (configMode === "day") return "Holding the day"
+    if (configMode === "night") return "Holding the night"
+    return idlePhrases.length > 0 ? idlePhrases[phraseIndex % idlePhrases.length] : ""
+  }
 
   readonly property string heroMeta: {
     if (!service) return "SERVICE NOT LOADED"
@@ -505,10 +523,9 @@ Panel {
 
   onOpenedChanged: {
     if (!opened) {
-      // Back to the fact. Opening on a half-faded joke would be a poor greeting,
-      // and a stopped animation leaves the opacity wherever it got to.
+      // A stopped animation leaves the opacity wherever it got to, and the panel
+      // would open on a half-faded line.
       phraseSwap.stop()
-      showingPhrase = false
       hero.metaOpacity = 1.0
       return
     }
@@ -538,11 +555,7 @@ Panel {
     }
 
     ScriptAction {
-      script: {
-        root.showingPhrase = !root.showingPhrase
-        if (root.showingPhrase)
-          root.phraseIndex = (root.phraseIndex + 1) % root.idlePhrases.length
-      }
+      script: root.phraseIndex = (root.phraseIndex + 1) % root.idlePhrases.length
     }
 
     PropertyAnimation {
@@ -1164,6 +1177,7 @@ Panel {
 
             width: parent.width
             title: "Before Sunset"
+            detail: root.heroBadge
             meta: root.heroLine
             foreground: root.fg
             fontFamily: root.face

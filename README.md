@@ -326,10 +326,13 @@ on.
 
 ![The heading line, carrying the screen temperature, the night dim and the night volume](docs/indicators.png)
 
-The heading itself alternates, while the panel is open and the schedule is
-running, between what the day is doing and a line about what the plugin is doing
-to work it out. Pinned or off it does not: those states say something worth
-reading, and a joke every few seconds would be sitting on top of it.
+What the day is doing sits in a pill in the corner of the heading — `DAY · 19:50`
+— where it can be read at any moment rather than waited for. The line under the
+heading is then free to say what the plugin is doing to work that out, and while
+the panel is open in Auto it cycles through a few of them. Pinned or off it does
+not cycle: holding a half is a state worth naming once, and a line that kept
+changing under a pinned desktop would suggest the plugin is up to something it
+is deliberately not up to.
 
 ### Sharing the toggle
 

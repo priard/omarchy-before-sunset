@@ -13,20 +13,23 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   were already there; the dim sat one section further down for no reason. All
   three now read at a glance, and each appears only once it is switched on.
 
-- **The heading says what it is doing while it waits.** Other Omarchy panels put
-  a rotating line where a status would be redundant, and this one has the same
-  spare room: "DAY UNTIL 19:50" repeats a number the schedule section is already
-  showing. So it alternates — the fact, a phrase, the fact again — never more
-  than one beat from the thing you came to read.
+- **What the day is doing moved to the corner of the heading**, into a pill —
+  `DAY · 19:50` — where it can be read at any moment rather than waited for. It
+  had been the whole of the line under the title, which is the one place in the
+  panel with nothing to do: the number it carried is already three rows down in
+  the schedule section.
 
-  Consulting the almanac. Sorting the twilights. Chasing the terminator.
-  Trigonometry, mostly. Every one of them is true of what the plugin actually
-  does, which is the only rule they follow: it really is an almanac algorithm,
-  there really are three twilights, and it really is arithmetic rather than an
-  API call.
+- **So that line now says what the plugin is doing to work it out.** Consulting
+  the almanac. Sorting the twilights. Chasing the terminator. Trigonometry,
+  mostly. Every one of them is true of what the plugin actually does, which is
+  the only rule they follow: it really is an almanac algorithm, there really are
+  three twilights, the terminator really is the line it chases, and it really is
+  arithmetic rather than an API call.
 
-  Only in Auto. Pinned reads "PINNED — NIGHT" and off reads "OFF", and those are
-  answers to a question somebody is about to ask.
+  Only in Auto does it cycle. Pinned it reads "Holding the night" and stays
+  there — holding a half is a state worth naming once, and a line that kept
+  changing under a pinned desktop would suggest the plugin is up to something it
+  is deliberately not up to.
 
 ## [0.7.0] - 2026-08-22
 
