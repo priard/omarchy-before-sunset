@@ -211,6 +211,7 @@ Panel {
   readonly property int dayBrightness: service ? service.dayBrightness : -1
   readonly property var brightnessTargets: service && service.brightnessTargets ? service.brightnessTargets : []
   readonly property var brightnessOverrides: service && service.brightnessOverrides ? service.brightnessOverrides : ({})
+  readonly property int brightnessFadeSeconds: service ? service.brightnessFadeSeconds : 20
   readonly property bool brightnessAvailable: service ? service.brightnessAvailable === true : false
 
   function brightnessLevelOf(value) {
@@ -223,6 +224,7 @@ Panel {
     var next = ({
       night: nightBrightness < 0 ? null : nightBrightness,
       day: dayBrightness < 0 ? null : dayBrightness,
+      fadeSeconds: brightnessFadeSeconds,
       displays: brightnessOverrides
     })
     for (var change in changes) next[change] = changes[change]
@@ -1858,16 +1860,32 @@ Panel {
               }
             }
 
-            NumberField {
+            Row {
               visible: root.nightBrightness >= 0
-              label: "Night level %"
-              value: Math.max(0, root.nightBrightness)
-              from: 5
-              to: 100
-              stepSize: 5
-              foreground: root.fg
-              fontFamily: root.face
-              onModified: function(value) { root.persist({ brightness: root.brightnessConfig({ night: value }) }) }
+              width: parent.width
+              spacing: Style.space(12)
+
+              NumberField {
+                label: "Night level %"
+                value: Math.max(0, root.nightBrightness)
+                from: 5
+                to: 100
+                stepSize: 5
+                foreground: root.fg
+                fontFamily: root.face
+                onModified: function(value) { root.persist({ brightness: root.brightnessConfig({ night: value }) }) }
+              }
+
+              NumberField {
+                label: "Fade (s)"
+                value: root.brightnessFadeSeconds
+                from: 0
+                to: 300
+                stepSize: 5
+                foreground: root.fg
+                fontFamily: root.face
+                onModified: function(value) { root.persist({ brightness: root.brightnessConfig({ fadeSeconds: value }) }) }
+              }
             }
 
             Item {
