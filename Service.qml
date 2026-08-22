@@ -1035,6 +1035,32 @@ Item {
     return pin("auto")
   }
 
+  // The panel's two other button groups, said in words. An empty mode changes
+  // nothing and reports the one in force, which is the honest answer to being
+  // asked for a mode and handed none.
+  function chooseSchedule(wanted) {
+    var mode = String(wanted || "").toLowerCase()
+    if (mode === "") return configAutoMode
+    if (mode !== "sun" && mode !== "fixed" && mode !== "sensor")
+      return "unknown schedule: " + wanted
+
+    persist({ autoMode: mode })
+    return mode
+  }
+
+  // "always" is the word on the button; "on" is the word in the file. Both are
+  // accepted rather than making anyone learn which is which.
+  function chooseNightlight(wanted) {
+    var mode = String(wanted || "").toLowerCase()
+    if (mode === "") return nightlightMode
+    if (mode === "always") mode = "on"
+    if (mode !== "off" && mode !== "auto" && mode !== "on")
+      return "unknown night light mode: " + wanted
+
+    persist({ nightlight: nightlightConfig({ mode: mode }) })
+    return mode
+  }
+
   // ------------------------------------------------------- background memory
 
   property var backgroundMemory: ({})
@@ -1537,6 +1563,23 @@ Item {
 
     function auto(): string {
       return root.pin("auto")
+    }
+
+    // The way back out. day/night/auto all start it again, so nothing is lost
+    // by using it — the slots, the backgrounds and the remembered transparency
+    // are all still there when it comes back.
+    function off(): string {
+      return root.pin("off")
+    }
+
+    // Which schedule "auto" follows: sun, fixed, or the light sensor.
+    function schedule(mode: string): string {
+      return root.chooseSchedule(mode)
+    }
+
+    // off, auto, or always — the same three the panel offers.
+    function nightlight(mode: string): string {
+      return root.chooseNightlight(mode)
     }
 
     // The same nudge a resume gives, for anyone who would rather hang it off

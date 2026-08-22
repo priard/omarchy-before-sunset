@@ -125,6 +125,22 @@ slot matching its own light/dark reading, and the other slot gets a stock
 counterpart. It starts working immediately without changing your desktop out
 from under you.
 
+## Updating
+
+```bash
+omarchy plugin update priard.before-sunset
+```
+
+It fetches, shows you the diff, fast-forwards, and re-validates the manifest —
+rolling the update back if the new revision does not pass. Run it without an id
+to be offered every git-managed plugin at once.
+
+Two things it will not do. It will not prompt for credentials, so the
+repository has to be readable without any: a public repo, or one your git
+already has a token for. And it will not merge over local edits, because it
+only ever fast-forwards — if you have been changing the plugin in place, it
+stops and says so rather than touching your work.
+
 ## Removal
 
 ```bash
@@ -435,13 +451,25 @@ observes, not configuration you would hand-write.
 ## CLI
 
 ```bash
-omarchy-shell before-sunset status    # JSON: mode, slots, transitions, location, remembered state
-omarchy-shell before-sunset toggle    # pin the other half, or hand control back to the schedule
-omarchy-shell before-sunset day       # pin the day slot
-omarchy-shell before-sunset night     # pin the night slot
-omarchy-shell before-sunset auto      # follow the schedule again
-omarchy-shell before-sunset refresh   # re-evaluate now, the same nudge a resume gives
+omarchy-shell before-sunset status              # JSON: mode, slots, transitions, location, remembered state
+omarchy-shell before-sunset toggle              # pin the other half, or hand control back to the schedule
+omarchy-shell before-sunset day                 # pin the day slot
+omarchy-shell before-sunset night               # pin the night slot
+omarchy-shell before-sunset auto                # follow the schedule again
+omarchy-shell before-sunset off                 # stand down; day, night or auto starts it again
+omarchy-shell before-sunset schedule sun        # what auto follows: sun, fixed, sensor
+omarchy-shell before-sunset nightlight always   # the night light: off, auto, always
+omarchy-shell before-sunset refresh             # re-evaluate now, the same nudge a resume gives
 ```
+
+Each answers with the value it settled on, so a binding can act on the result
+rather than asking again. `schedule` and `nightlight` want one word; hand
+either an empty string and it reports the mode in force without changing it.
+
+Nothing here sets a number. Temperatures, offsets, thresholds and volumes are
+chosen in the panel, where you can see what they do to the day while you pick
+them — a number typed blind at a prompt is the one thing this plugin has no
+good way to show you.
 
 Bind the toggle to a key in `~/.config/hypr/bindings.lua` if you want it on the
 keyboard rather than the bar.

@@ -5,6 +5,34 @@ Notable changes to Before Sunset.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.4] - 2026-08-22
+
+### Added
+
+- **The command line reaches the other two mode groups.** `schedule` picks what
+  auto follows — sun, fixed hours, or the light sensor — and `nightlight` takes
+  off, auto or always, the same three words the panel puts on its buttons.
+  `off` stands the plugin down, and day, night or auto starts it again with
+  every slot, background and remembered transparency still in place.
+
+  Each answers with the value it settled on, so a key binding can act on the
+  result rather than asking twice. Handed an empty string, both report the mode
+  in force and change nothing.
+
+  Deliberately no numbers: temperatures, offsets, thresholds and volumes stay
+  in the panel, where the day is drawn while you choose them. A number typed
+  blind at a prompt is the one kind of setting this plugin cannot show you the
+  consequence of.
+
+### Changed
+
+- **The readme says how to update.** `omarchy plugin update` on this plugin
+  fetches, shows the diff, fast-forwards and re-validates — with the two limits
+  worth knowing before you meet them: it never prompts for credentials, and it
+  never merges over local edits.
+
+- **A fresh night light screenshot**, matching the panel as it stands.
+
 ## [0.6.3] - 2026-08-22
 
 ### Added
