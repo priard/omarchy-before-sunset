@@ -5,6 +5,32 @@ Notable changes to Before Sunset.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.3] - 2026-08-22
+
+### Added
+
+- **The panel's icon is drawn, not typed.** A braille cell is a grid of 2x4
+  dots, so six characters across three lines give a canvas twelve dots square —
+  enough for a disc that reads as round, which a drawing made of block elements
+  at this size cannot manage.
+
+  By day the sun's rays turn slowly. The disc itself holds still: what moves is
+  the light coming off it. Only while the panel is open, so a closed panel costs
+  nothing.
+
+  By night it is the moon, at **tonight's real phase**. Counted from a known new
+  moon through the mean synodic month, which is a picture rather than an
+  ephemeris — it drifts a few hours against the sky and under a day across a
+  century, and nobody can see that in twelve dots. The terminator is drawn as an
+  ellipse, which is what makes a crescent a crescent rather than a bitten
+  circle, and the unlit part is a rim rather than nothing, so a new moon is
+  still a moon and not an empty square.
+
+  The moon does not animate. It is the one thing in the icon that is measured
+  rather than drawn, and spinning it would be a lie about that.
+
+  The bar keeps its single glyph, because a bar cell is one character wide.
+
 ## [0.7.2] - 2026-08-22
 
 ### Added

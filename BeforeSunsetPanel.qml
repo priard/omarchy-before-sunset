@@ -2,6 +2,8 @@ import QtQuick
 import Quickshell.Io
 import qs.Ui
 import qs.Commons
+import "Sun.js" as Sun
+import "Sky.js" as Sky
 
 // Bar button plus the settings popup for Before Sunset.
 //
@@ -308,6 +310,17 @@ Panel {
   // escapes rather than literal glyphs: private-use characters do not survive
   // every editor and transport, and one that gets eaten leaves a blank button
   // with nothing to indicate what went wrong.
+  // The bar keeps a single glyph, because a bar cell is one character wide. The
+  // panel has room for the twelve-dot version.
+  property real rayPhase: 0
+
+  readonly property real moonIllumination: Sun.moonIllumination(new Date(root.nowMs))
+  readonly property bool moonWaxing: Sun.moonWaxing(new Date(root.nowMs))
+
+  readonly property var skyLines: side === "night"
+    ? Sky.moon(moonIllumination, moonWaxing)
+    : Sky.sun(rayPhase)
+
   readonly property string sunGlyph: "\ue30d"
   readonly property string moonGlyph: "\ue32b"
   readonly property string barIcon: side === "day" ? sunGlyph : moonGlyph
@@ -559,6 +572,16 @@ Panel {
     resolveService()
     if (service) service.probeBackground()
     refreshRequested()
+  }
+
+  // The disc holds still and the light turns off it. Only while the panel is
+  // open, and only by day: a moon that spun would be a lie about the one thing
+  // in this icon that is measured rather than drawn.
+  Timer {
+    interval: 120
+    repeat: true
+    running: root.opened && root.side !== "night"
+    onTriggered: root.rayPhase = (root.rayPhase + Math.PI / 64) % (Math.PI * 2)
   }
 
   // Only in Auto, and only with a service behind it. Pinned reads "PINNED —
@@ -1209,10 +1232,16 @@ Panel {
             foreground: root.fg
             fontFamily: root.face
             iconComponent: Text {
-              text: root.barIcon
+              text: root.skyLines.join("\n")
               color: root.fg
               font.family: root.face
-              font.pixelSize: Style.font.display
+              font.pixelSize: Style.font.caption
+              // Braille cells are drawn to sit on a text baseline with room to
+              // spare; at default spacing the disc comes out taller than it is
+              // wide, which is the one thing a circle must not be.
+              lineHeight: 0.78
+              lineHeightMode: Text.ProportionalHeight
+              horizontalAlignment: Text.AlignHCenter
             }
           }
 

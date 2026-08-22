@@ -217,3 +217,32 @@ function fixedSchedule(now, dayAt, nightAt) {
 
   return scheduleFromEvents(now, events)
 }
+
+// ------------------------------------------------------------------- moon
+
+// The moon's age and how much of its disc is lit, for the icon that stands in
+// for night. Counted from a known new moon through the mean synodic month,
+// which is a picture rather than an ephemeris: it drifts by a few hours against
+// the real moon and by under a day across a century. Nobody looking at a
+// twelve-dot icon can tell, and the alternative is a table this plugin has no
+// business carrying.
+var SYNODIC_MONTH = 29.530588853
+var KNOWN_NEW_MOON = Date.UTC(2000, 0, 6, 18, 14)
+
+function moonAge(when) {
+  var days = ((when ? when.getTime() : Date.now()) - KNOWN_NEW_MOON) / MS_PER_DAY
+  var age = days % SYNODIC_MONTH
+  return age < 0 ? age + SYNODIC_MONTH : age
+}
+
+// 0 at new moon, 1 at full.
+function moonIllumination(when) {
+  return (1 - Math.cos(2 * Math.PI * moonAge(when) / SYNODIC_MONTH)) / 2
+}
+
+// Which limb is lit. Waxing lights the right in the northern hemisphere, and
+// this draws it that way: the icon is a picture of the moon people grew up
+// with, not a rendering of the sky above the coordinates in the settings.
+function moonWaxing(when) {
+  return moonAge(when) < SYNODIC_MONTH / 2
+}
