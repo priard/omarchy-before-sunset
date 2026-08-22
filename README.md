@@ -149,20 +149,24 @@ stops and says so rather than touching your work.
 omarchy plugin remove priard.before-sunset
 ```
 
-That disables the plugin, unloads it and deletes its directory. No restart is
-needed: the shell rescans its plugins on the way out.
+That is the whole of it for the plugin: it disables it, which drops its entry —
+slots, schedule, levels and all — out of `~/.config/omarchy/shell.json`, then
+deletes the directory and rescans. No restart, and nothing left in your config.
 
-It leaves two things behind, both safe to delete and neither of them removed for
-you, because they are yours. The remembered wallpapers and per-theme bar
-transparency:
+One file stays, and it is not deleted for you because it holds choices you made:
+which wallpaper goes with which theme, and which themes wanted a transparent
+bar.
 
 ```bash
 rm ~/.local/state/omarchy/settings/before-sunset.json
 ```
 
-And the plugin's own entry in `~/.config/omarchy/shell.json`, which holds the
-slots, the schedule and the levels — wherever you put the widget, and in the
-`plugins` list if it is there too:
+Delete it before reinstalling if you want the plugin to seed itself from scratch
+rather than pick up where it left off.
+
+If the shell was not running when you removed the plugin, the entry cannot have
+been dropped from the config and will still be there. This takes it out of the
+bar layout and the plugins list, wherever it ended up:
 
 ```bash
 jq '(.bar.layout |= map_values(map(select(.id != "priard.before-sunset"))))
@@ -170,10 +174,6 @@ jq '(.bar.layout |= map_values(map(select(.id != "priard.before-sunset"))))
   ~/.config/omarchy/shell.json > /tmp/shell.json &&
   mv /tmp/shell.json ~/.config/omarchy/shell.json
 ```
-
-The shell reads that file as it changes, so this needs no restart either. Run it
-before reinstalling if you want the plugin to seed itself from scratch rather
-than pick up where it left off.
 
 One thing genuinely stays changed: the bar's `transparent` flag is left wherever
 the schedule last set it, because it is a bar setting rather than a plugin one.

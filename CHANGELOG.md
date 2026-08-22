@@ -9,16 +9,18 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **Removal says how to remove everything**, with the commands rather than the
-  names. The entry in `shell.json` needed a `jq` line, because it can sit in the
-  bar layout, the plugins list, or both; deleting it by hand meant finding it
-  first. Neither leftover is deleted for you — they hold choices you made — and
-  neither step needs a restart, because `omarchy plugin remove` rescans on the
-  way out and the shell reads its config as it changes.
+- **Removal takes the config entry with it, and the readme now says so.** The
+  section had claimed the entry in `shell.json` was left behind and handed over
+  a `jq` line to remove it. It is not left behind: `omarchy plugin remove`
+  disables the plugin first, and disabling splices the entry — slots, schedule,
+  levels and all — straight out of the bar layout or the plugins list. The `jq`
+  line stays as the fallback for the one case where it does survive, which is
+  removing the plugin while the shell is not running.
 
-  Also named the one thing that genuinely stays changed: the bar's `transparent`
-  flag, which is a bar setting rather than a plugin one, and is left wherever
-  the schedule last put it.
+  What actually remains is one file, `before-sunset.json`, and it is not deleted
+  for you because it holds choices somebody made. Also named the one thing that
+  genuinely stays changed: the bar's `transparent` flag, a bar setting rather
+  than a plugin one, left wherever the schedule last put it.
 
 - **The night light stops asking every three seconds when nobody is looking.**
   Each probe is a shell script, an `hyprctl` round trip and a `jq` — thirty-two
