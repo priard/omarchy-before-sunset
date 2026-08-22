@@ -320,14 +320,22 @@ early** is right underneath if you would rather it began sooner.
 ![The night light section, with the day tinted by the temperature the screen will be](docs/night-light.png)
 
 A line under the panel heading carries the temperature on screen, in a swatch of
-that colour, alongside the night dim and the night volume, so none of the three
-needs its section opened to be checked. Each appears only once it is switched
-on.
+that colour, alongside the dim and the volume, so none of the three needs its
+section opened to be checked. Each level names the half it belongs to — `80% at
+day` while the day is running, `40% at night` once the night is — and shows the
+half that is coming when the one running has no level of its own.
+
+The dim and the volume appear only while they are actually going to move. Pin a
+half or run on the light sensor and they stand down, so the line drops them
+rather than promising something nobody is going to do. The night light stays,
+because it keeps its own hours whatever the mode.
 
 ![The heading line, carrying the screen temperature, the night dim and the night volume](docs/indicators.png)
 
-What the day is doing sits in a pill in the corner of the heading — `DAY · 19:50`
-— where it can be read at any moment rather than waited for. The line under the
+What the day is doing sits in a pill in the corner of the heading — `DAY → 19:50`
+— where it can be read at any moment rather than waited for. The arrow rather
+than a separator, because the time is not a property of the half that is
+running: it is where that half is going. The line under the
 heading is then free to say what the plugin is doing to work that out, and while
 the panel is open in Auto it cycles through a few of them. Pinned or off it does
 not cycle: holding a half is a state worth naming once, and a line that kept

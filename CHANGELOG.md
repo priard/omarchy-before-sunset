@@ -9,12 +9,24 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- **The night dim joins the heading line.** The temperature and the night volume
-  were already there; the dim sat one section further down for no reason. All
-  three now read at a glance, and each appears only once it is switched on.
+- **The dim joins the heading line.** The temperature and the volume were
+  already there; the dim sat one section further down for no reason. All three
+  now read at a glance.
+
+- **The levels name the half they belong to.** They read the night value and
+  said "at night" whatever the hour, which was unreadable at four in the
+  afternoon once a day level could be set too. Now the line shows the half that
+  is running — `80% at day` — and falls back to the half that is coming when
+  the one running has no level of its own.
+
+- **The dim and the volume leave the line when they have stood down.** Pinned,
+  or under the light sensor, neither of them moves; a line promising 40% at
+  night was promising something nobody was going to do. The night light stays
+  put, because it keeps its own hours whatever the mode.
 
 - **What the day is doing moved to the corner of the heading**, into a pill —
-  `DAY · 19:50` — where it can be read at any moment rather than waited for. It
+  `DAY → 19:50`, an arrow rather than a separator, because the time is not a
+  property of the half that is running but where that half is going — where it can be read at any moment rather than waited for. It
   had been the whole of the line under the title, which is the one place in the
   panel with nothing to do: the number it carried is already three rows down in
   the schedule section.

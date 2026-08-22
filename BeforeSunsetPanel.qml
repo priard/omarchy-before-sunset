@@ -260,6 +260,24 @@ Panel {
     return "Day · " + dayBrightness + "%"
   }
 
+  // Which level is worth a line: the one in force now if it is set, and the one
+  // that is coming if it is not. Naming the half it belongs to matters once both
+  // can be set — "40%" alone is unreadable at four in the afternoon.
+  function levelNote(nightLevel, dayLevel) {
+    var atNight = side === "night"
+
+    var here = atNight ? nightLevel : dayLevel
+    if (here >= 0) return here + (atNight ? "% at night" : "% at day")
+
+    var coming = atNight ? dayLevel : nightLevel
+    if (coming >= 0) return coming + (atNight ? "% at day" : "% at night")
+
+    return ""
+  }
+
+  readonly property string brightnessNote: levelNote(nightBrightness, dayBrightness)
+  readonly property string volumeNote: levelNote(nightVolume, dayVolume)
+
   readonly property string volumeSummary: {
     if (nightVolume < 0 && dayVolume < 0) return "Off"
     if (nightVolume >= 0 && dayVolume >= 0) return "Night " + nightVolume + "% · day " + dayVolume + "%"
@@ -346,7 +364,9 @@ Panel {
     if (configMode === "off") return "OFF"
     if (configMode === "day" || configMode === "night") return "PINNED · " + configMode.toUpperCase()
     if (side === "") return "AUTO"
-    return side.toUpperCase() + (nextTransition ? " · " + clockOf(nextTransition) : "")
+    // An arrow rather than a separator: the time is not a property of the half
+    // that is running, it is where the half is going.
+    return side.toUpperCase() + (nextTransition ? " \u2192 " + clockOf(nextTransition) : "")
   }
 
   // Nothing rotates outside Auto: holding a half is a state worth naming once,
@@ -1192,7 +1212,13 @@ Panel {
           // What the schedule is doing to the screen and the speakers right now,
           // where you can see it without opening either section.
           Row {
-            visible: root.nightlightEnabled || root.nightBrightness >= 0 || root.nightVolume >= 0
+            // The night light is here whenever it is on, because it keeps its own
+            // hours and runs whatever the mode. The other two are only here when
+            // they are actually going to move: pinned or under the light sensor
+            // they stand down, and a line promising 40% at night would be
+            // promising something nobody is going to do.
+            visible: root.nightlightEnabled
+              || (root.onATimetable && (root.brightnessNote !== "" || root.volumeNote !== ""))
             width: parent.width
             spacing: Style.space(14)
 
@@ -1220,7 +1246,7 @@ Panel {
             }
 
             Row {
-              visible: root.nightBrightness >= 0
+              visible: root.onATimetable && root.brightnessNote !== ""
               spacing: Style.space(6)
 
               Text {
@@ -1234,7 +1260,7 @@ Panel {
               }
 
               Text {
-                text: root.nightBrightness + "% at night"
+                text: root.brightnessNote
                 color: root.dim
                 font.family: root.face
                 font.pixelSize: Style.font.caption
@@ -1242,7 +1268,7 @@ Panel {
             }
 
             Row {
-              visible: root.nightVolume >= 0
+              visible: root.onATimetable && root.volumeNote !== ""
               spacing: Style.space(6)
 
               Text {
@@ -1255,7 +1281,7 @@ Panel {
               }
 
               Text {
-                text: root.nightVolume + "% at night"
+                text: root.volumeNote
                 color: root.dim
                 font.family: root.face
                 font.pixelSize: Style.font.caption
