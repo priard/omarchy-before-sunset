@@ -5,6 +5,55 @@ Notable changes to Before Sunset.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.3] - 2026-08-22
+
+### Changed
+
+- **The night light stops asking every three seconds when nobody is looking.**
+  Each probe is a shell script, an `hyprctl` round trip and a `jq` — thirty-two
+  milliseconds measured, which at three seconds is twenty-eight thousand runs a
+  day for a value that only changes when somebody presses a key. Three seconds
+  is kept for when it earns it: the panel open, a ramp in flight, or a write
+  still settling. Otherwise fifteen, which is still well inside the minute the
+  schedule itself runs on.
+
+- **The light sensor is read only when its reading is on screen.** "No reason to
+  read a sensor nobody is looking at" was the intent; "the panel is open" was
+  too loose a reading of it. One raw read blocks in the driver for about six
+  hundred milliseconds while the sensor wakes and integrates — twice over on a
+  machine with two of them — so an open panel spent a second in every three
+  reading a sensor, and holding it awake, on desktops where the number was not
+  visible and the schedule was not using it. It now also wants the schedule
+  section unfolded and the sensor actually selected.
+
+- **The retry that waits for the service gives up.** Where the service never
+  arrives, it was two wake-ups a second for the length of the session, asking a
+  question that had already been answered. Twenty attempts, then it stops.
+
+### Added
+
+- **The panel's icon is drawn, not typed.** A braille cell is a grid of 2x4
+  dots, so six characters across three lines give a canvas twelve dots square —
+  enough for a disc that reads as round, which a drawing made of block elements
+  at this size cannot manage.
+
+  By day the sun's rays turn slowly. The disc itself holds still: what moves is
+  the light coming off it. Only while the panel is open, so a closed panel costs
+  nothing.
+
+  By night it is the moon, at **tonight's real phase**. Counted from a known new
+  moon through the mean synodic month, which is a picture rather than an
+  ephemeris — it drifts a few hours against the sky and under a day across a
+  century, and nobody can see that in twelve dots. The terminator is drawn as an
+  ellipse, which is what makes a crescent a crescent rather than a bitten
+  circle, and the unlit part is a rim rather than nothing, so a new moon is
+  still a moon and not an empty square.
+
+  The moon does not animate. It is the one thing in the icon that is measured
+  rather than drawn, and spinning it would be a lie about that.
+
+  The bar keeps its single glyph, because a bar cell is one character wide.
+
 ## [0.7.2] - 2026-08-22
 
 ### Added

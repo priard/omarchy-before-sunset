@@ -1,6 +1,6 @@
 # Before Sunset
 
-**Version 0.7.2** · [what changed](CHANGELOG.md)
+**Version 0.7.3** · [what changed](CHANGELOG.md)
 
 Follow the sun: one Omarchy theme through the day, another through the night,
 each with its own wallpaper and its own answer to whether the top bar should be
@@ -321,6 +321,15 @@ early** is right underneath if you would rather it began sooner.
 
 ![The night light section, with the day tinted by the temperature the screen will be](docs/night-light.png)
 
+The icon beside the heading is drawn rather than typed: a braille canvas twelve
+dots square, which is enough for a disc that reads as round. By day the sun's
+rays turn slowly — the disc holds still, because what moves is the light coming
+off it — and only while the panel is open. By night it is the moon, at tonight's
+real phase, counted from a known new moon through the mean synodic month. It
+drifts a few hours against the sky and under a day across a century, which
+nobody can see in twelve dots. The unlit part is drawn as a rim, so a new moon
+is still a moon rather than an empty square.
+
 A line under the panel heading carries the temperature on screen, in a swatch of
 that colour, alongside the dim and the volume, so none of the three needs its
 section opened to be checked. Each level names the half it belongs to — `80% at
@@ -627,7 +636,8 @@ restricts what you can put where.
 manifest.json          plugin metadata
 Service.qml            the schedule, adoption, and remembered state
 BeforeSunsetPanel.qml     bar icon and settings panel
-Sun.js                 sunrise/sunset, pure functions, no dependencies
+Sun.js                 sunrise/sunset and the moon's phase, pure functions
+Sky.js                 the sun and the moon drawn in braille, pure functions
 bin/before-sunset-apply   switch a theme, restoring its remembered background
 bin/before-sunset-pick    open the theme picker with a given theme preselected
 bin/before-sunset-themes  list installed themes and which side each reads as

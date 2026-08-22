@@ -2,6 +2,8 @@ import QtQuick
 import Quickshell.Io
 import qs.Ui
 import qs.Commons
+import "Sun.js" as Sun
+import "Sky.js" as Sky
 
 // Bar button plus the settings popup for Before Sunset.
 //
@@ -308,6 +310,17 @@ Panel {
   // escapes rather than literal glyphs: private-use characters do not survive
   // every editor and transport, and one that gets eaten leaves a blank button
   // with nothing to indicate what went wrong.
+  // The bar keeps a single glyph, because a bar cell is one character wide. The
+  // panel has room for the twelve-dot version.
+  property real rayPhase: 0
+
+  readonly property real moonIllumination: Sun.moonIllumination(new Date(root.nowMs))
+  readonly property bool moonWaxing: Sun.moonWaxing(new Date(root.nowMs))
+
+  readonly property var skyLines: side === "night"
+    ? Sky.moon(moonIllumination, moonWaxing)
+    : Sky.sun(rayPhase)
+
   readonly property string sunGlyph: "\ue30d"
   readonly property string moonGlyph: "\ue32b"
   readonly property string barIcon: side === "day" ? sunGlyph : moonGlyph
@@ -554,11 +567,23 @@ Panel {
       // would open on a half-faded line.
       phraseSwap.stop()
       hero.metaOpacity = 1.0
+      if (service) service.watched = false
       return
     }
     resolveService()
+    if (service) service.watched = true
     if (service) service.probeBackground()
     refreshRequested()
+  }
+
+  // The disc holds still and the light turns off it. Only while the panel is
+  // open, and only by day: a moon that spun would be a lie about the one thing
+  // in this icon that is measured rather than drawn.
+  Timer {
+    interval: 120
+    repeat: true
+    running: root.opened && root.side !== "night"
+    onTriggered: root.rayPhase = (root.rayPhase + Math.PI / 64) % (Math.PI * 2)
   }
 
   // Only in Auto, and only with a service behind it. Pinned reads "PINNED —
@@ -592,12 +617,20 @@ Panel {
   }
 
   // The bar can be built before the service loader has finished; a couple of
-  // cheap retries beat leaving the widget permanently inert.
+  // cheap retries beat leaving the widget permanently inert. A couple, though:
+  // where the service never arrives at all, this was two wake-ups a second for
+  // as long as the session lasted, forever asking a question that had already
+  // been answered.
+  property int serviceAttempts: 0
+
   Timer {
     interval: 500
     repeat: true
-    running: root.service === null
-    onTriggered: root.resolveService()
+    running: root.service === null && root.serviceAttempts < 20
+    onTriggered: {
+      root.serviceAttempts++
+      root.resolveService()
+    }
   }
 
   Timer {
@@ -608,13 +641,20 @@ Panel {
     onTriggered: root.nowMs = Date.now()
   }
 
-  // While the panel is open the reading is on screen, so it is polled faster
-  // than the service needs for switching. Only while open: no reason to read a
-  // sensor nobody is looking at.
+  // "No reason to read a sensor nobody is looking at" was the intent, and being
+  // open was too loose a reading of it. One raw read blocks in the driver for
+  // about six hundred milliseconds while the sensor wakes and integrates, twice
+  // over on a machine with two of them — so this ran for a second out of every
+  // three, and kept an ambient light sensor powered up, on desktops where the
+  // reading was not on screen and the schedule was not using it.
+  //
+  // Now it means what it said: the panel open, the schedule section unfolded,
+  // and the sensor actually the thing being configured.
   Timer {
     interval: 3000
     repeat: true
     running: root.opened && root.sensorAvailable
+      && root.effectiveAutoMode === "sensor" && scheduleSection.expanded
     triggeredOnStart: true
     onTriggered: if (root.service) root.service.probeSensor()
   }
@@ -1209,10 +1249,16 @@ Panel {
             foreground: root.fg
             fontFamily: root.face
             iconComponent: Text {
-              text: root.barIcon
+              text: root.skyLines.join("\n")
               color: root.fg
               font.family: root.face
-              font.pixelSize: Style.font.display
+              font.pixelSize: Style.font.caption
+              // Braille cells are drawn to sit on a text baseline with room to
+              // spare; at default spacing the disc comes out taller than it is
+              // wide, which is the one thing a circle must not be.
+              lineHeight: 0.78
+              lineHeightMode: Text.ProportionalHeight
+              horizontalAlignment: Text.AlignHCenter
             }
           }
 
