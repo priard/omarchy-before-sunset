@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Print a line every time this machine comes back from suspend.
+#
+# Long-running by design: the caller keeps the process open and reads one line
+# per resume. logind announces the return on the system bus, and it announces
+# it before the lock screen has asked for a password — which is the whole
+# point. A laptop that slept through the night should already be wearing the
+# day theme by the time anyone looks at it, not turn over while they watch.
+#
+# Broadcast signals need no privilege to receive, so this listens as the user
+# and asks for nothing. gdbus does the listening because glib is on every
+# desktop; `busctl monitor` and `dbus-monitor` would both want the
+# eavesdropping rights the system bus reserves for root.
+#
+# Output: the line "wake", once per resume. Nothing else is printed.
+
+set -uo pipefail
+
+command -v gdbus >/dev/null || exit 127
+
+# gdbus writes through stdio, which turns block-buffered the moment its output
+# is a pipe: a resume would sit in a 4 KB buffer until enough further resumes
+# pushed it out, which on a laptop is days. Line buffering is what makes this
+# timely at all.
+stdbuf -oL gdbus monitor --system \
+  --dest org.freedesktop.login1 \
+  --object-path /org/freedesktop/login1 2>/dev/null |
+  while IFS= read -r line; do
+    # PrepareForSleep carries true on the way down and false on the way back
+    # up. Only the way back up is news.
+    [[ $line == *PrepareForSleep* ]] || continue
+    [[ $line == *false* ]] || continue
+    echo wake
+  done

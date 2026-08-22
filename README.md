@@ -440,6 +440,7 @@ omarchy-shell before-sunset toggle    # pin the other half, or hand control back
 omarchy-shell before-sunset day       # pin the day slot
 omarchy-shell before-sunset night     # pin the night slot
 omarchy-shell before-sunset auto      # follow the schedule again
+omarchy-shell before-sunset refresh   # re-evaluate now, the same nudge a resume gives
 ```
 
 Bind the toggle to a key in `~/.config/hypr/bindings.lua` if you want it on the
@@ -456,6 +457,15 @@ of the day the current instant falls in, and compares that against the theme
 actually on screen. That is what makes it survive suspend, hibernate, clock
 changes and daylight saving: a laptop opened after two days asleep corrects
 itself on the next tick rather than waiting out a timer that never ran.
+
+The tick is monotonic, so it does not run while the machine is suspended, and on
+its own it would leave a laptop opened in the morning showing last night's theme
+for the better part of a minute. So the resume is not waited for. logind
+announces it on the system bus the moment it happens, ahead of the lock screen
+asking for a password, and the schedule is evaluated there — which is early
+enough that the right half of the day is already on screen behind the password
+prompt. It is a shortcut rather than the mechanism: on a machine with no `gdbus`
+the tick still corrects everything, just later.
 
 Inside the polar circles there are stretches with no sunrise or sunset at all.
 The schedule falls back to the `fixed` clock times so the desktop keeps some
@@ -485,6 +495,7 @@ bin/before-sunset-slot      resolve a slot's preview and wallpaper for the panel
 bin/before-sunset-sensor    read the ambient light sensor, if there is one
 bin/before-sunset-volume    ease the output volume to a level over a few seconds
 bin/before-sunset-nightlight  read or set the screen colour temperature
+bin/before-sunset-wake      report each resume from suspend, so the theme can catch up at once
 ```
 
 ## Requirements and dependencies
@@ -494,9 +505,13 @@ A stock Omarchy 4. Nothing to install.
 The plugin shells out only to `bash`, `jq`, coreutils, and Omarchy's own
 commands — `omarchy-theme-set`, `omarchy-theme-bg-set`, `omarchy-theme-color`,
 `omarchy-theme-switcher`, `omarchy-menu-images`, `omarchy-audio-output-sink`,
-`omarchy-notification-send` — plus `pactl` for the volume fade and `hyprctl`
-for the night light, all part of a base install. It makes no network requests: sunrise and sunset
+`omarchy-notification-send` — plus `pactl` for the volume fade, `hyprctl`
+for the night light, and `gdbus` for the resume announcement, all part of a
+base install. It makes no network requests: sunrise and sunset
 are arithmetic, not an API call.
+
+It listens on the system bus for logind's resume announcement, which is a
+broadcast signal: received with no privileges, and nothing is sent back.
 
 It reads `/sys/bus/iio/devices/` for a light sensor, sets the output volume and
 the screen colour temperature when you ask it to, and writes to exactly two

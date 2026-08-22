@@ -13,6 +13,9 @@ import "Sun.js" as Sun
 // actually on screen. That is what makes it survive suspend, hibernate, clock
 // changes and daylight saving: a laptop opened after two days asleep corrects
 // itself on the next tick instead of waiting out a timer that never ran.
+//
+// The resume is not waited for, though: logind announces it on the system bus,
+// and the correction lands before the lock screen has been answered.
 Item {
   id: root
 
@@ -1396,6 +1399,54 @@ Item {
     onTriggered: root.evaluate()
   }
 
+  // ------------------------------------------------------------------ wake
+
+  // That tick is monotonic: it does not run while the machine is suspended, so
+  // a laptop opened in the morning can sit on last night's theme for the
+  // better part of a minute before the tick that corrects it comes round.
+  // Long enough to watch the desktop turn over, which is the one thing a
+  // plugin about the sun should never make anyone see.
+  //
+  // logind announces the resume on the system bus at the moment it happens,
+  // ahead of the lock screen asking for a password. Evaluating there means the
+  // right half of the day is already on screen behind the password prompt.
+  Process {
+    id: wakeWatch
+    command: [root.pluginFile("bin/before-sunset-wake")]
+    running: true
+    stdout: SplitParser {
+      onRead: root.wake()
+    }
+    // The watcher is a shortcut, not the mechanism: the minute tick still
+    // corrects everything, just late. So a machine with no gdbus, or a bus
+    // that went away, costs a retry every half minute and nothing else.
+    onExited: wakeRetry.restart()
+  }
+
+  Timer {
+    id: wakeRetry
+    interval: 30000
+    onTriggered: if (!wakeWatch.running) wakeWatch.running = true
+  }
+
+  // Hyprland is still coming back at the instant logind announces the resume,
+  // and hyprctl can refuse a call that would have worked a second later. The
+  // second pass is what makes the theme and the screen temperature stick when
+  // the first one arrived too early to land.
+  Timer {
+    id: wakeSettle
+    interval: 3000
+    onTriggered: root.evaluate()
+  }
+
+  function wake() {
+    // A sensor reading taken before the suspend describes a room that has had
+    // all night to change, and the schedule is about to be computed from it.
+    if (configMode === "auto" && configAutoMode === "sensor") probeSensor()
+    evaluate()
+    wakeSettle.restart()
+  }
+
   // Probed once at startup even when the sensor is not in use, so the panel can
   // offer the option only on machines that actually have one.
   Component.onCompleted: { loadThemes(); probeSensor() }
@@ -1486,6 +1537,14 @@ Item {
 
     function auto(): string {
       return root.pin("auto")
+    }
+
+    // The same nudge a resume gives, for anyone who would rather hang it off
+    // their own hook — hypridle's after_sleep_cmd, a lid script — than rely on
+    // the bus, and for seeing the wake path work without suspending a machine.
+    function refresh(): string {
+      root.wake()
+      return root.side === "" ? "off" : root.side
     }
   }
 }

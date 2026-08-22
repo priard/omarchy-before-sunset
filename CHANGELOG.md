@@ -5,6 +5,30 @@ Notable changes to Before Sunset.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.3] - 2026-08-22
+
+### Added
+
+- **A machine waking up is already in the right half of the day.** The minute
+  tick is monotonic — it does not run while the machine is suspended — so a
+  laptop that slept through the night could sit on the night theme for the
+  better part of a minute after being opened, and turn over while its owner
+  watched. logind announces a resume on the system bus at the moment it
+  happens, before the lock screen has asked for a password; the schedule is now
+  evaluated there, so the day theme is already on screen behind the prompt.
+
+  A second pass follows three seconds later, because Hyprland is still coming
+  back at the instant the announcement arrives and `hyprctl` can refuse a call
+  that would have worked a moment afterwards.
+
+  It is a shortcut rather than a new mechanism: where there is no `gdbus`, or
+  the bus goes away, the tick still corrects everything exactly as it did
+  before, just later.
+
+- **`omarchy-shell before-sunset refresh`** re-evaluates on demand — the same
+  nudge a resume gives, for anyone who would rather hang it off their own hook
+  than rely on the bus.
+
 ## [0.6.2] - 2026-08-21
 
 ### Added
