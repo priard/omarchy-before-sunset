@@ -319,6 +319,30 @@ Panel {
     return (locationName !== "" ? locationName + " — " : "") + "sunrise " + rise + ", sunset " + set
   }
 
+  // Other Omarchy panels put a rotating line where a status would be redundant,
+  // and this one has the same spare room: "DAY UNTIL 19:50" repeats a number the
+  // schedule section is already showing. So the meta alternates — the fact, then
+  // a phrase, then the fact again, so it is never more than one beat away.
+  //
+  // Every one of them is true of what the plugin is actually doing, which is the
+  // only rule they follow. Nothing here is bending light.
+  readonly property var idlePhrases: [
+    "Watching the sky",
+    "Consulting the almanac",
+    "Sorting the twilights",
+    "Counting daylight",
+    "Minding the dusk",
+    "Chasing the terminator",
+    "Trigonometry, mostly"
+  ]
+
+  property int phraseIndex: 0
+  property bool showingPhrase: false
+
+  readonly property string heroLine: showingPhrase && idlePhrases.length > 0
+    ? idlePhrases[phraseIndex % idlePhrases.length]
+    : heroMeta
+
   readonly property string heroMeta: {
     if (!service) return "SERVICE NOT LOADED"
     if (!service.configured) return "SETTING UP"
@@ -480,10 +504,51 @@ Panel {
   signal refreshRequested()
 
   onOpenedChanged: {
-    if (!opened) return
+    if (!opened) {
+      // Back to the fact. Opening on a half-faded joke would be a poor greeting,
+      // and a stopped animation leaves the opacity wherever it got to.
+      phraseSwap.stop()
+      showingPhrase = false
+      hero.metaOpacity = 1.0
+      return
+    }
     resolveService()
     if (service) service.probeBackground()
     refreshRequested()
+  }
+
+  // Only in Auto, and only with a service behind it. Pinned reads "PINNED —
+  // NIGHT" and off reads "OFF"; those are answers to a question someone is
+  // about to ask, and covering them with a joke every few seconds would be
+  // hiding the one thing worth reading.
+  Timer {
+    id: phraseTimer
+    interval: 2800
+    repeat: true
+    running: root.opened && root.service !== null && root.configMode === "auto"
+    onTriggered: phraseSwap.restart()
+  }
+
+  SequentialAnimation {
+    id: phraseSwap
+
+    PropertyAnimation {
+      target: hero; property: "metaOpacity"
+      to: 0.0; duration: 180; easing.type: Easing.OutQuad
+    }
+
+    ScriptAction {
+      script: {
+        root.showingPhrase = !root.showingPhrase
+        if (root.showingPhrase)
+          root.phraseIndex = (root.phraseIndex + 1) % root.idlePhrases.length
+      }
+    }
+
+    PropertyAnimation {
+      target: hero; property: "metaOpacity"
+      to: 1.0; duration: 260; easing.type: Easing.InQuad
+    }
   }
 
   // The bar can be built before the service loader has finished; a couple of
@@ -1095,9 +1160,11 @@ Panel {
           spacing: Style.space(18)
 
           PanelHero {
+            id: hero
+
             width: parent.width
             title: "Before Sunset"
-            meta: root.heroMeta
+            meta: root.heroLine
             foreground: root.fg
             fontFamily: root.face
             iconComponent: Text {
@@ -1111,7 +1178,7 @@ Panel {
           // What the schedule is doing to the screen and the speakers right now,
           // where you can see it without opening either section.
           Row {
-            visible: root.nightlightEnabled || root.nightVolume >= 0
+            visible: root.nightlightEnabled || root.nightBrightness >= 0 || root.nightVolume >= 0
             width: parent.width
             spacing: Style.space(14)
 
@@ -1132,6 +1199,28 @@ Panel {
               Text {
                 text: root.nightlightHeld ? root.nightlightActual + " K held"
                   : (root.nightlightActual > 0 ? root.nightlightActual + " K" : "night light")
+                color: root.dim
+                font.family: root.face
+                font.pixelSize: Style.font.caption
+              }
+            }
+
+            Row {
+              visible: root.nightBrightness >= 0
+              spacing: Style.space(6)
+
+              Text {
+                // nf-md-brightness_6, and above the basic plane like the speaker
+                // below it, so it is written as a code point rather than an
+                // escape that would only cover half of it.
+                text: String.fromCodePoint(0xf00e0)
+                color: root.dim
+                font.family: root.face
+                font.pixelSize: Style.font.caption
+              }
+
+              Text {
+                text: root.nightBrightness + "% at night"
                 color: root.dim
                 font.family: root.face
                 font.pixelSize: Style.font.caption

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "priard.before-sunset",
   "name": "Before Sunset",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "author": "priard",
   "license": "MIT",
   "description": "Switch themes with the sun: one theme for the day half, another for the night half.",

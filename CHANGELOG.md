@@ -5,6 +5,29 @@ Notable changes to Before Sunset.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-08-22
+
+### Added
+
+- **The night dim joins the heading line.** The temperature and the night volume
+  were already there; the dim sat one section further down for no reason. All
+  three now read at a glance, and each appears only once it is switched on.
+
+- **The heading says what it is doing while it waits.** Other Omarchy panels put
+  a rotating line where a status would be redundant, and this one has the same
+  spare room: "DAY UNTIL 19:50" repeats a number the schedule section is already
+  showing. So it alternates — the fact, a phrase, the fact again — never more
+  than one beat from the thing you came to read.
+
+  Consulting the almanac. Sorting the twilights. Chasing the terminator.
+  Trigonometry, mostly. Every one of them is true of what the plugin actually
+  does, which is the only rule they follow: it really is an almanac algorithm,
+  there really are three twilights, and it really is arithmetic rather than an
+  API call.
+
+  Only in Auto. Pinned reads "PINNED — NIGHT" and off reads "OFF", and those are
+  answers to a question somebody is about to ask.
+
 ## [0.7.0] - 2026-08-22
 
 ### Added

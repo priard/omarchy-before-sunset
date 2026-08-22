@@ -320,10 +320,16 @@ early** is right underneath if you would rather it began sooner.
 ![The night light section, with the day tinted by the temperature the screen will be](docs/night-light.png)
 
 A line under the panel heading carries the temperature on screen, in a swatch of
-that colour, alongside the night volume, so neither needs its section opened to
-be checked.
+that colour, alongside the night dim and the night volume, so none of the three
+needs its section opened to be checked. Each appears only once it is switched
+on.
 
-![The heading line, carrying the screen temperature and the night volume](docs/indicators.png)
+![The heading line, carrying the screen temperature, the night dim and the night volume](docs/indicators.png)
+
+The heading itself alternates, while the panel is open and the schedule is
+running, between what the day is doing and a line about what the plugin is doing
+to work it out. Pinned or off it does not: those states say something worth
+reading, and a joke every few seconds would be sitting on top of it.
 
 ### Sharing the toggle
 
