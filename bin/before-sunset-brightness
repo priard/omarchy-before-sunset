@@ -473,6 +473,14 @@ ramp() {
     owned_gamma=$gamma
     gamma_write "$gamma"
     land_hardware
+
+    # Dawn writes the hardware first, so where the displays were is no longer
+    # where they are. Without this the drift check reads our own write as
+    # somebody else's hand on the keys and abandons the slide two seconds in.
+    for index in "${!ramp_ids[@]}"; do
+      ramp_currents[index]=${ramp_targets[index]}
+    done
+
     fade_gamma "$gamma" 100 "$seconds"
     ((owned_gamma < 0)) || { gamma_write 100; owned_gamma=-1; }
   fi
