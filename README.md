@@ -6,7 +6,7 @@ Follow the sun: one Omarchy theme through the day, another through the night,
 each with its own wallpaper and its own answer to whether the top bar should be
 transparent.
 
-![The Before Sunset panel](docs/panel.png)
+![The Before Sunset panel](preview.png)
 
 The name is a loose nod to Linklater's *Before Sunset*, and to the two films
 either side of it — between them they cover sunrise, sunset and midnight. This
