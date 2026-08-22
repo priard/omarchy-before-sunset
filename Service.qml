@@ -507,11 +507,24 @@ Item {
   // pin, or a switch between schedules cannot be mistaken for dusk falling.
   property string lastScheduledSide: ""
 
-  // Only the time-based schedules move the volume. Under the light sensor a
-  // lamp being switched on is not the morning, and nobody wants the room
-  // getting louder because someone opened the blinds.
+  // Which mode the last evaluation ran under. A start has no last evaluation,
+  // and that is the whole difference between beginning a session and handing
+  // control back: one must not touch the room, the other must.
+  property string scheduledUnder: ""
+
+  // Pinning a half is an instruction to hold the settings for that half, and
+  // the volume and the brightness have no hours of their own to fall back on —
+  // they only ever ride this schedule. So a pin stops them: nothing should move
+  // on a timetable the desktop has been taken off.
+  //
+  // The light sensor stops them too, for a different reason. It answers whether
+  // the room is dark, not when it turned, and a fade has to happen at the turn.
+  // A lamp switched on is not the morning.
   function noteScheduledSide() {
-    if (autoSource !== "sun" && autoSource !== "fixed") {
+    var wasUnder = scheduledUnder
+    scheduledUnder = configMode
+
+    if (configMode !== "auto" || (autoSource !== "sun" && autoSource !== "fixed")) {
       lastScheduledSide = ""
       return
     }
@@ -522,6 +535,16 @@ Item {
     // are; it is not a transition and must not fade anything.
     if (lastScheduledSide === "") {
       lastScheduledSide = autoSide
+
+      // Unless control is being handed back. A machine pinned to Day all
+      // evening would otherwise sit on daylight levels until tomorrow's dusk,
+      // which is the schedule quietly not running for a whole night. Auto means
+      // now, and the theme has always behaved that way: it repaints the moment
+      // it is handed the wheel rather than waiting for the next turn.
+      if (wasUnder !== "" && wasUnder !== "auto") {
+        fadeVolumeFor(autoSide)
+        applyBrightnessFor(autoSide)
+      }
       return
     }
 
@@ -983,6 +1006,7 @@ Item {
     schedule = computeSchedule()
     if (!schedule) {
       lastScheduledSide = ""
+      scheduledUnder = configMode
       return
     }
 

@@ -46,15 +46,23 @@ Panel {
 
   readonly property string autoSource: service ? String(service.autoSource) : ""
 
-  // Dimming a section should mean one thing and only one: nothing here is being
-  // driven right now. Off stops everything. The light sensor answers "the room
-  // is dark" without answering "and it turned at 19:51" — enough for a theme and
-  // a temperature, not enough for a fade that has to happen at the turn.
-  readonly property bool onATimetable: configMode !== "off"
+  // Dimming a section means one thing and only one: nothing here is being driven
+  // right now. Pinning a half is an instruction to hold that half's settings, so
+  // the schedule stands down and everything riding it stands down with it. The
+  // light sensor stops the fades for a different reason: it answers whether the
+  // room is dark without answering when it turned, and a fade has to happen at
+  // the turn.
+  readonly property bool scheduleRunning: configMode === "auto"
+
+  readonly property bool onATimetable: scheduleRunning
     && (autoSource === "sun" || autoSource === "fixed")
 
   readonly property string timetableNote: {
     if (configMode === "off") return "The plugin is off, so nothing moves this."
+    if (!scheduleRunning)
+      return "A half is pinned, so the schedule is not running and this does not move. "
+        + "Switch back to Auto and it lands on the half of the day that is running, "
+        + "without waiting for the next turn."
     if (onATimetable) return ""
     return "The light sensor says whether the room is dark, not when it will turn. "
       + "With no turn to move on, this stays where you leave it."
@@ -1229,15 +1237,16 @@ Panel {
             // so it stays on screen and says so rather than disappearing and
             // taking its own explanation with it.
             visible: root.configMode !== "off"
+            muted: !root.scheduleRunning
             title: "SCHEDULE"
             summary: root.scheduleSummary
 
             Text {
               visible: root.configMode === "day" || root.configMode === "night"
               width: parent.width
-              text: "Pinned, so the theme is not following this. The night light, the "
-                + "brightness and the volume still are: the day still turns, it just "
-                + "does not repaint anything."
+              text: "Pinned, so the schedule is not running: nothing here moves the "
+                + "theme, the brightness or the volume until Auto takes over. The night "
+                + "light keeps going, because it has hours of its own."
               color: root.dim
               font.family: root.face
               font.pixelSize: Style.font.caption
@@ -1904,6 +1913,7 @@ Panel {
             title: "VOLUME"
             summary: root.volumeSummary
             muted: !root.onATimetable
+
 
             Text {
               visible: root.timetableNote !== ""

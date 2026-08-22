@@ -263,15 +263,15 @@ Three modes, and they are its own, not the theme's:
 
 Keeping this separate from the theme's mode matters: pinning a theme to Day
 says something about colours on screen, not about whether your eyes want a
-warmer picture at midnight. The schedule is computed either way, so the night
-light — and the brightness, and the volume — keep working while a theme is
-pinned. Only turning the plugin off stops all of it.
+warmer picture at midnight. Because it has hours of its own, it keeps them while
+a theme is pinned — it is the one thing on the schedule that does.
 
-The panel says so rather than hiding the evidence: pin a half and the schedule
-section stays where it was, at full strength, still showing the day it is still
-keeping. What does dim is the volume and the brightness under the light sensor,
-because there they genuinely never move — the sensor answers whether the room
-is dark, not when it turned, and a fade has to happen at the turn.
+The volume and the brightness have no hours of their own; they only ever ride
+the schedule. So pinning a half stops them, and the panel dims all three
+sections to say so. Everything stays adjustable while dimmed — setting the night
+levels in the middle of the afternoon is the normal way round — and switching
+back to Auto lands them on the half of the day that is running, without waiting
+for the next turn.
 
 ### Its own hours, if you want them
 
@@ -349,9 +349,9 @@ stays hushed either way. Reach for the volume keys mid-fade and the fade gives
 way, because someone pressing them has an opinion about the volume that
 outranks the schedule's.
 
-Only the sun and fixed hours move it, and only when they turn the day over.
-Pinning a half yourself never does — that is you choosing a theme, not the day
-ending. The light sensor never does either: a lamp switched on is not the
+Only the sun and fixed hours move it, and only when they turn the day over, and
+only while the schedule is running: pin a half and it stands still until Auto
+takes over again. The light sensor stops it too — a lamp switched on is not the
 morning, and a room that brightens should not get louder.
 
 The sink is resolved through `omarchy-audio-output-sink`, the same helper the
@@ -372,8 +372,8 @@ of the afternoon is still where you left it at dusk, because dusk only ever
 moves a screen further down. There is a floor of a few percent under every
 target: a screen at zero is a screen nobody can find the setting on again.
 
-Only the sun and fixed hours move it, and only at the turn of the day — not
-when you pin a half, and never under the light sensor.
+Only the sun and fixed hours move it, and only at the turn of the day. Pinning a
+half stops it until Auto takes over, and the light sensor never moves it at all.
 
 No notification is sent. This is the one change on the schedule nobody can fail
 to notice, and announcing it would be telling you what you are looking at.

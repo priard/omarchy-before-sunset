@@ -42,15 +42,30 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   The line under the mode buttons said "the schedule is not running", which was
   the same lie in fewer words. It now says the theme is not following it.
 
-- **Dimming a section means one thing: nothing here is being driven.** Which is
-  never true of the schedule, and is true of the volume and the brightness
-  under the light sensor — it answers whether the room is dark, not when it
-  turned, and a fade has to happen at the turn. Those two now dim there, and
-  when the plugin is off, and say which of the two it is.
+- **A pinned half stops the volume and the brightness.** Pinning Day or Night
+  is an instruction to hold that half's settings, and neither of those two has
+  hours of its own to fall back on — they only ever ride the schedule. So the
+  schedule stands down with the pin and they stand down with it, rather than
+  moving the room on a timetable the desktop has been taken off.
 
-  Keyed on the schedule actually in force rather than the one chosen, so
-  picking the light sensor before calibrating it — where the sun quietly keeps
-  running underneath — leaves them live, because they are.
+  The night light is the exception, and on purpose: it has its own hours, so it
+  keeps them. Pinning a theme says something about colours on screen, not about
+  whether your eyes want a warmer picture at midnight.
+
+- **Handing control back lands the room where the schedule says it is.** A
+  machine pinned to Day all evening would otherwise sit on daylight levels until
+  tomorrow's dusk — the schedule quietly not running for a whole night. Auto now
+  means now, which is how the theme has always behaved: it repaints the moment
+  it is handed the wheel rather than waiting for the next turn. A fresh session
+  is still not a hand-back and still fades nothing.
+
+- **Dimming a section means one thing: nothing here is being driven.** The
+  schedule, the volume and the brightness dim while a half is pinned, and the
+  volume and the brightness dim under the light sensor too — it answers whether
+  the room is dark, not when it turned, and a fade has to happen at the turn.
+  Each says which of the two it is. Everything stays adjustable while dimmed:
+  setting up the night levels in the middle of the afternoon is the normal way
+  round.
 
 - **Apple's displays are driven per device.** `omarchy-brightness-display
   --monitor DP-2` takes the monitor name and then hands the work to a helper
