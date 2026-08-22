@@ -32,11 +32,15 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the schedule section.
 
 - **So that line now says what the plugin is doing to work it out.** Consulting
-  the almanac. Sorting the twilights. Chasing the terminator. Trigonometry,
-  mostly. Every one of them is true of what the plugin actually does, which is
-  the only rule they follow: it really is an almanac algorithm, there really are
-  three twilights, the terminator really is the line it chases, and it really is
-  arithmetic rather than an API call.
+  the almanac. Reading the twilights. Halving the day. Solving for dusk.
+
+  Two rules. Each has to be true of what the plugin actually does: it really is
+  an almanac algorithm, there really are three twilights to read, the terminator
+  really is the line it chases, and dusk really is solved for rather than asked
+  after. And none of them borrows a verb from the other panels that do this —
+  Omarchy has five such lists, and between them they have already taken sorting,
+  counting, watching and thirty more. Sounding like the network panel with
+  different nouns would be the joke wearing someone else's coat.
 
   Only in Auto does it cycle. Pinned it reads "Holding the night" and stays
   there — holding a half is a state worth naming once, and a line that kept

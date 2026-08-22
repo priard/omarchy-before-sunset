@@ -342,16 +342,21 @@ Panel {
   // has somewhere better to be. It does: the corner of the heading row, in a
   // pill, where it can be read at any moment rather than waited for.
   //
-  // Every phrase is true of what the plugin is actually doing, which is the only
-  // rule they follow. Nothing here is bending light.
+  // Two rules. Each phrase has to be true of what the plugin is actually doing —
+  // it really does run an almanac algorithm, there really are three twilights,
+  // and the terminator really is the line it follows. And none of them borrows a
+  // verb from the other panels that do this: Omarchy has five such lists and
+  // between them they have already taken sorting, counting, watching, polishing
+  // and thirty more. Sounding like the network panel with different nouns would
+  // be the joke wearing someone else's coat.
   readonly property var idlePhrases: [
-    "Watching the sky",
     "Consulting the almanac",
-    "Sorting the twilights",
-    "Counting daylight",
-    "Minding the dusk",
+    "Reading the twilights",
+    "Reckoning the hours",
+    "Halving the day",
     "Chasing the terminator",
-    "Trigonometry, mostly"
+    "Solving for dusk",
+    "Minding the horizon"
   ]
 
   property int phraseIndex: 0
