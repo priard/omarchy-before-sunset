@@ -567,9 +567,11 @@ Panel {
       // would open on a half-faded line.
       phraseSwap.stop()
       hero.metaOpacity = 1.0
+      if (service) service.watched = false
       return
     }
     resolveService()
+    if (service) service.watched = true
     if (service) service.probeBackground()
     refreshRequested()
   }
@@ -615,12 +617,20 @@ Panel {
   }
 
   // The bar can be built before the service loader has finished; a couple of
-  // cheap retries beat leaving the widget permanently inert.
+  // cheap retries beat leaving the widget permanently inert. A couple, though:
+  // where the service never arrives at all, this was two wake-ups a second for
+  // as long as the session lasted, forever asking a question that had already
+  // been answered.
+  property int serviceAttempts: 0
+
   Timer {
     interval: 500
     repeat: true
-    running: root.service === null
-    onTriggered: root.resolveService()
+    running: root.service === null && root.serviceAttempts < 20
+    onTriggered: {
+      root.serviceAttempts++
+      root.resolveService()
+    }
   }
 
   Timer {
@@ -631,13 +641,20 @@ Panel {
     onTriggered: root.nowMs = Date.now()
   }
 
-  // While the panel is open the reading is on screen, so it is polled faster
-  // than the service needs for switching. Only while open: no reason to read a
-  // sensor nobody is looking at.
+  // "No reason to read a sensor nobody is looking at" was the intent, and being
+  // open was too loose a reading of it. One raw read blocks in the driver for
+  // about six hundred milliseconds while the sensor wakes and integrates, twice
+  // over on a machine with two of them — so this ran for a second out of every
+  // three, and kept an ambient light sensor powered up, on desktops where the
+  // reading was not on screen and the schedule was not using it.
+  //
+  // Now it means what it said: the panel open, the schedule section unfolded,
+  // and the sensor actually the thing being configured.
   Timer {
     interval: 3000
     repeat: true
     running: root.opened && root.sensorAvailable
+      && root.effectiveAutoMode === "sensor" && scheduleSection.expanded
     triggeredOnStart: true
     onTriggered: if (root.service) root.service.probeSensor()
   }

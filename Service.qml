@@ -462,12 +462,23 @@ Item {
     onTriggered: root.applyNightlight()
   }
 
+  // Set by the panel while it is open. Nothing else should touch it: it means
+  // "somebody is looking at these numbers right now", not "these numbers
+  // matter".
+  property bool watched: false
+
   // The night light toggle lives on the bar and in the menu, and pressing it
-  // should register here in a moment, not on the next minute boundary. A
-  // hyprctl query is cheap enough to ask this often; a minute of the panel
-  // disagreeing with the screen is not.
+  // should register here in a moment rather than on the next minute boundary.
+  //
+  // But "a moment" is not the same when nobody is looking. Each probe is a
+  // shell script, an hyprctl round trip and a jq — thirty-odd milliseconds,
+  // which at three seconds is eight hundred runs an hour, all day, for a value
+  // that changes when somebody presses a key. So three seconds is kept for when
+  // it earns it: the panel open, a ramp in flight, or a write still settling.
+  // Otherwise fifteen, which is still well inside the minute the schedule
+  // itself runs on.
   Timer {
-    interval: 3000
+    interval: root.watched || root.nightlightRamping || nightlightApply.running ? 3000 : 15000
     repeat: true
     running: true
     triggeredOnStart: true
