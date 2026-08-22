@@ -5,6 +5,42 @@ Notable changes to Before Sunset.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.4] - 2026-08-23
+
+### Fixed
+
+- **The fades no longer signal a process they were told about by a file
+  anybody could write.** Both the volume fade and the brightness ramp kept a
+  PID in `$XDG_RUNTIME_DIR`, falling back to a predictable path under `/tmp`
+  when that variable was unset. Another local user could create that name
+  first: the contents were trusted well enough to be handed to `kill`, and the
+  path was truncated through an ordinary redirection. Reported against the
+  marketplace's security baseline, and correct.
+
+  A kernel with `protected_symlinks` and `protected_regular` stops the
+  truncation half. It does not stop the other half, because those guard writing
+  to somebody else's file rather than reading it — a planted PID would still
+  have been signalled, and it would have been a process belonging to the same
+  user, which is to say one of their own.
+
+  Two changes. The lock now lives in a directory that is ours alone: the
+  session's runtime directory where there is one, otherwise `/tmp/before-sunset-<uid>`
+  created 0700, refused outright if a symlink stands in its place or the owner
+  is not us. And nothing is signalled at all — replacing a running fade is
+  cooperative. The newcomer writes its own token into the lock; the incumbent
+  re-reads it every step, finds a token that is not its own, and stands down.
+  No PID is trusted because no PID is used.
+
+  The report named the brightness ramp. The volume fade had the same shape and
+  is fixed with it.
+
+- **A ramp that takes over from another finishes the job.** Standing down leaves
+  the gamma table to whoever holds the lock, which meant the newcomer read a
+  half-dimmed screen, mistook it for a stranger's setting, and backed away —
+  leaving the screen dimmed with nobody left to undo it. It now recognises the
+  ramp it replaced, picks up from where that one got to, and returns gamma to
+  full at the end.
+
 ## [0.7.3] - 2026-08-22
 
 ### Changed

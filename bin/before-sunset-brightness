@@ -294,10 +294,82 @@ gamma_write() {
 # What we last wrote, so our own dim can be told from somebody else's.
 owned_gamma=-1
 
-# Global, because the EXIT trap reads it after the frame that would have held it
-# is gone — and under `set -u` an unset name there takes the trap down with it,
-# which is precisely when the screen is still dimmed.
-lock="${XDG_RUNTIME_DIR:-/tmp}/before-sunset-brightness.pid"
+# A lock no other user can reach, that is never signalled.
+#
+# The old shape was a PID written to a predictable path under /tmp whenever
+# XDG_RUNTIME_DIR was unset. Two things were wrong with that, and neither is
+# worth arguing about: another local user can create that name first, and the
+# contents were trusted well enough to be handed to kill. The second half
+# survives even where the kernel's protected_symlinks and protected_regular
+# stop the first, because those guard writing to somebody else's file, not
+# reading it — a planted PID would still have been signalled.
+#
+# So: the directory is owner-only, and nothing is signalled at all. Replacing a
+# running ramp is cooperative. The newcomer writes its own token into the lock;
+# the incumbent re-reads the file every step, finds a token that is not its own,
+# and stands down by itself, leaving the gamma table to whoever holds the lock.
+# No PID is trusted because no PID is used.
+#
+# Both are global, because the EXIT trap reads them after the frame that would
+# have held them is gone — and under `set -u` an unset name there takes the trap
+# down with it, which is precisely when the screen is still dimmed.
+
+lock=""
+token=""
+
+# Set when the lock was already held when we claimed it. The holder can only
+# have been another run of this script, because the directory is ours alone —
+# so the dimmed gamma we are about to read is the plugin's own half-finished
+# ramp, not a stranger's setting, and is ours to continue from rather than to
+# back away from.
+took_over=0
+
+runtime_directory() {
+  local dir=${XDG_RUNTIME_DIR:-}
+
+  # The session's own runtime directory is already 0700 and ours. Anything else
+  # has to be made that way before it can be used, and a symlink standing where
+  # the directory should be is refused rather than followed.
+  if [[ -n $dir && ! -L $dir && -d $dir && -O $dir ]]; then
+    printf '%s\n' "$dir"
+    return 0
+  fi
+
+  dir="/tmp/before-sunset-$(id -u)"
+  [[ -L $dir ]] && return 1
+  mkdir -m 700 -p "$dir" 2>/dev/null || return 1
+  [[ ! -L $dir && -d $dir && -O $dir ]] || return 1
+  chmod 700 "$dir" 2>/dev/null || return 1
+
+  printf '%s\n' "$dir"
+}
+
+claim_lock() {
+  local dir
+  dir=$(runtime_directory) || return 1
+
+  lock="$dir/$1"
+  [[ -e $lock ]] && took_over=1
+  token="$$.$(date +%s%N)"
+  printf '%s\n' "$token" >"$lock" 2>/dev/null || { lock=""; return 1; }
+
+  # Long enough for an incumbent to reach its next step and see the new token.
+  sleep 0.25
+}
+
+# True when nobody has taken the lock from us. Also true when there is no lock
+# at all: a machine where the directory cannot be secured runs without the
+# serialising, which is worse behaviour but not less safe behaviour.
+holds_lock() {
+  [[ -n $lock ]] || return 0
+  [[ $(cat "$lock" 2>/dev/null) == "$token" ]]
+}
+
+release_lock() {
+  [[ -n $lock ]] || return 0
+  holds_lock && rm -f "$lock"
+  lock=""
+}
 
 release_gamma() {
   ((owned_gamma >= 0)) || return 0
@@ -351,6 +423,14 @@ fade_gamma() {
 
     sleep 0.2
     ((ticks++))
+
+    # A newer ramp holds the lock now and is driving the same gamma table.
+    # Disown it rather than putting it back to full on the way out: what is on
+    # the table is the newcomer's, not ours to undo.
+    if ! holds_lock; then
+      owned_gamma=-1
+      return 3
+    fi
 
     # Both checks cost a round trip, so neither runs every tick. Gamma is asked
     # about once a second; the displays every two, because someone reaching for
@@ -417,23 +497,9 @@ ramp() {
   ((${#ramp_ids[@]} > 0)) || return 0
 
   # One ramp at a time. A dawn arriving on top of a dusk should replace it, not
-  # race it across the same gamma table.
-  if [[ -r $lock ]]; then
-    local previous
-    previous=$(cat "$lock" 2>/dev/null)
-    if [[ $previous =~ ^[0-9]+$ ]] && kill -0 "$previous" 2>/dev/null; then
-      kill "$previous" 2>/dev/null
-      # Let its own exit put gamma back before we read it, or we would take its
-      # half-finished dim for the resting state and ramp from there.
-      local waited=0
-      while kill -0 "$previous" 2>/dev/null && ((waited < 20)); do
-        sleep 0.1
-        ((waited++))
-      done
-      sleep 0.2
-    fi
-  fi
-  echo $$ >"$lock"
+  # race it across the same gamma table. Claiming the lock is what tells the
+  # incumbent to stand down, and the wait inside it is what gives it time to.
+  claim_lock "brightness.lock"
 
   local index ratio gamma=0
   for index in "${!ramp_ids[@]}"; do
@@ -453,19 +519,28 @@ ramp() {
   # No ramp is possible, or none is worth doing: no hyprsunset behind the
   # socket, gamma already held below full by something else, or a slide too
   # shallow to see. The step is still owed either way.
-  if ((seconds <= 0)) || ((gamma >= 98)) ||
-    [[ ! $resting =~ ^[0-9]+$ ]] || ((resting < 98)); then
+  #
+  # "Something else" excludes the ramp we just took the lock from. Backing away
+  # from our own half-finished slide would leave the screen dimmed with nobody
+  # left to undo it, which is exactly what happened the first time this was
+  # written.
+  if ((seconds <= 0)) || ((gamma >= 98)) || [[ ! $resting =~ ^[0-9]+$ ]] ||
+    { ((resting < 98)) && ((took_over == 0)); }; then
     land_hardware
-    rm -f "$lock"
+    release_lock
     return 0
   fi
 
-  trap 'release_gamma; rm -f "$lock"' EXIT INT TERM
+  trap 'release_gamma; release_lock' EXIT INT TERM
+
+  # Picking up where the ramp we replaced left off, when there was one.
+  local from=100
+  ((took_over == 0)) || from=$resting
 
   if [[ $direction == down ]]; then
-    fade_gamma 100 "$gamma" "$seconds"
+    fade_gamma "$from" "$gamma" "$seconds"
     case $? in
-    2) return 0 ;;
+    2 | 3) return 0 ;;
     esac
     land_hardware
     release_gamma

@@ -1,6 +1,6 @@
 # Before Sunset
 
-**Version 0.7.3** · [what changed](CHANGELOG.md)
+**Version 0.7.4** · [what changed](CHANGELOG.md)
 
 Follow the sun: one Omarchy theme through the day, another through the night,
 each with its own wallpaper and its own answer to whether the top bar should be

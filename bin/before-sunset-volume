@@ -49,15 +49,78 @@ esac
 
 ((current != target)) || exit 0
 
+# ------------------------------------------------------------------- locking
+
+# A lock no other user can reach, that is never signalled.
+#
+# The old shape was a PID written to a predictable path under /tmp whenever
+# XDG_RUNTIME_DIR was unset. Two things were wrong with that, and neither is
+# worth arguing about: another local user can create that name first, and the
+# contents were trusted well enough to be handed to kill. The second half
+# survives even where the kernel's protected_symlinks and protected_regular
+# stop the first, because those guard writing to somebody else's file, not
+# reading it — a planted PID would still have been signalled.
+#
+# So: the directory is owner-only, and nothing is signalled at all. Replacing a
+# running fade is cooperative. The newcomer writes its own token into the lock;
+# the incumbent re-reads the file every step, finds a token that is not its own,
+# and stands down by itself. No PID is trusted because no PID is used.
+
+lock=""
+token=""
+
+runtime_directory() {
+  local dir=${XDG_RUNTIME_DIR:-}
+
+  # The session's own runtime directory is already 0700 and ours. Anything else
+  # has to be made that way before it can be used, and a symlink standing where
+  # the directory should be is refused rather than followed.
+  if [[ -n $dir && ! -L $dir && -d $dir && -O $dir ]]; then
+    printf '%s\n' "$dir"
+    return 0
+  fi
+
+  dir="/tmp/before-sunset-$(id -u)"
+  [[ -L $dir ]] && return 1
+  mkdir -m 700 -p "$dir" 2>/dev/null || return 1
+  [[ ! -L $dir && -d $dir && -O $dir ]] || return 1
+  # A directory that already existed keeps the mode it had, which may not be
+  # the one we asked for.
+  chmod 700 "$dir" 2>/dev/null || return 1
+
+  printf '%s\n' "$dir"
+}
+
+claim_lock() {
+  local dir
+  dir=$(runtime_directory) || return 1
+
+  lock="$dir/$1"
+  token="$$.$(date +%s%N)"
+  printf '%s\n' "$token" >"$lock" 2>/dev/null || { lock=""; return 1; }
+
+  # Long enough for an incumbent to reach its next step and see the new token.
+  sleep 0.25
+}
+
+# True when nobody has taken the lock from us. Also true when there is no lock
+# at all: a machine where the directory cannot be secured runs without the
+# serialising, which is worse behaviour but not less safe behaviour.
+holds_lock() {
+  [[ -n $lock ]] || return 0
+  [[ $(cat "$lock" 2>/dev/null) == "$token" ]]
+}
+
+release_lock() {
+  [[ -n $lock ]] || return 0
+  holds_lock && rm -f "$lock"
+  lock=""
+}
+
 # One fade at a time. A day transition landing on top of a night fade should
 # replace it, not race it.
-lock="${XDG_RUNTIME_DIR:-/tmp}/before-sunset-volume.pid"
-if [[ -r $lock ]]; then
-  previous=$(cat "$lock" 2>/dev/null)
-  [[ $previous =~ ^[0-9]+$ ]] && kill "$previous" 2>/dev/null
-fi
-echo $$ >"$lock"
-trap 'rm -f "$lock"' EXIT
+claim_lock "volume.lock"
+trap release_lock EXIT INT TERM
 
 # Roughly four steps a second: fine enough to hear as a slide rather than a
 # staircase, coarse enough not to spam the sound server.
@@ -68,6 +131,10 @@ steps=$((fade * 4))
 expected=$current
 
 for ((i = 1; i <= steps; i++)); do
+  # A newer fade has taken the lock: it is on its way to the same speakers with
+  # a fresher opinion, so this one stands down.
+  holds_lock || exit 0
+
   # Someone reaching for the volume keys mid-fade means they have an opinion
   # about the volume, which outranks the schedule's. Stop rather than fight.
   actual=$(read_percent)
