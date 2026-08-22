@@ -32,15 +32,25 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **A pinned theme dims the schedule instead of hiding it.** Pinning Day or
-  Night removed the whole section, which left two separators stacked with a gap
-  between them — and told a lie on the way out. The schedule keeps running
-  while a theme is pinned: the night light, the brightness and the volume all
-  still follow it, and only turning the plugin off stops any of that. So the
-  section stays, dimmed and still adjustable, and says what it is still driving.
+- **A pinned theme keeps the schedule on screen.** Pinning Day or Night removed
+  the whole section, which left two separators stacked with a gap between them
+  — and told a lie on the way out. The schedule keeps running while a theme is
+  pinned: the night light, the brightness and the volume all still follow it,
+  and only turning the plugin off stops any of that. So the section stays, at
+  full strength and fully adjustable, and says what it is still driving.
 
   The line under the mode buttons said "the schedule is not running", which was
   the same lie in fewer words. It now says the theme is not following it.
+
+- **Dimming a section means one thing: nothing here is being driven.** Which is
+  never true of the schedule, and is true of the volume and the brightness
+  under the light sensor — it answers whether the room is dark, not when it
+  turned, and a fade has to happen at the turn. Those two now dim there, and
+  when the plugin is off, and say which of the two it is.
+
+  Keyed on the schedule actually in force rather than the one chosen, so
+  picking the light sensor before calibrating it — where the sun quietly keeps
+  running underneath — leaves them live, because they are.
 
 - **Apple's displays are driven per device.** `omarchy-brightness-display
   --monitor DP-2` takes the monitor name and then hands the work to a helper

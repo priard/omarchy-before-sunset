@@ -268,7 +268,10 @@ light — and the brightness, and the volume — keep working while a theme is
 pinned. Only turning the plugin off stops all of it.
 
 The panel says so rather than hiding the evidence: pin a half and the schedule
-section stays on screen, dimmed, still showing the day it is still keeping.
+section stays where it was, at full strength, still showing the day it is still
+keeping. What does dim is the volume and the brightness under the light sensor,
+because there they genuinely never move — the sensor answers whether the room
+is dark, not when it turned, and a fade has to happen at the turn.
 
 ### Its own hours, if you want them
 

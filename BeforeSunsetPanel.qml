@@ -44,6 +44,22 @@ Panel {
   readonly property int sunriseOffsetMinutes: service ? service.sunriseOffsetMinutes : 0
   readonly property int sunsetOffsetMinutes: service ? service.sunsetOffsetMinutes : 0
 
+  readonly property string autoSource: service ? String(service.autoSource) : ""
+
+  // Dimming a section should mean one thing and only one: nothing here is being
+  // driven right now. Off stops everything. The light sensor answers "the room
+  // is dark" without answering "and it turned at 19:51" — enough for a theme and
+  // a temperature, not enough for a fade that has to happen at the turn.
+  readonly property bool onATimetable: configMode !== "off"
+    && (autoSource === "sun" || autoSource === "fixed")
+
+  readonly property string timetableNote: {
+    if (configMode === "off") return "The plugin is off, so nothing moves this."
+    if (onATimetable) return ""
+    return "The light sensor says whether the room is dark, not when it will turn. "
+      + "With no turn to move on, this stays where you leave it."
+  }
+
   readonly property bool sensorAvailable: service ? service.sensorAvailable === true : false
   readonly property bool sensorRead: service ? service.sensorRead === true : false
   readonly property real sensorValue: service ? service.sensorValue : 0
@@ -1213,7 +1229,6 @@ Panel {
             // so it stays on screen and says so rather than disappearing and
             // taking its own explanation with it.
             visible: root.configMode !== "off"
-            muted: root.configMode !== "auto"
             title: "SCHEDULE"
             summary: root.scheduleSummary
 
@@ -1661,9 +1676,20 @@ Panel {
 
             title: "BRIGHTNESS"
             summary: root.brightnessSummary
+            muted: !root.onATimetable
             // Nothing is drawn on a machine where no display answers, the same
             // way the light sensor is absent rather than greyed out.
             visible: root.brightnessAvailable
+
+            Text {
+              visible: root.timetableNote !== ""
+              width: parent.width
+              text: root.timetableNote
+              color: root.dim
+              font.family: root.face
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.WordWrap
+            }
 
             Item {
               width: parent.width
@@ -1877,6 +1903,17 @@ Panel {
           Disclosure {
             title: "VOLUME"
             summary: root.volumeSummary
+            muted: !root.onATimetable
+
+            Text {
+              visible: root.timetableNote !== ""
+              width: parent.width
+              text: root.timetableNote
+              color: root.dim
+              font.family: root.face
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.WordWrap
+            }
 
             Item {
               width: parent.width
