@@ -332,7 +332,7 @@ half or run on the light sensor and they stand down, so the line drops them
 rather than promising something nobody is going to do. The night light stays,
 because it keeps its own hours whatever the mode.
 
-![The heading line, carrying the screen temperature, the night dim and the night volume](docs/indicators.png)
+![The heading, with what the day is doing in the corner and the temperature, the dim and the volume beneath it](docs/indicators.png)
 
 What the day is doing sits in a pill in the corner of the heading — `DAY → 19:50`
 — where it can be read at any moment rather than waited for. The arrow rather

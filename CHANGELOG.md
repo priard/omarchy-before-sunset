@@ -46,6 +46,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   file. It is the third place the number lives, and the three are expected to
   agree.
 
+- **The heading screenshot was retaken.** It still showed a two-item line under
+  a heading with no pill in it, while the caption underneath had been rewritten
+  in 0.7.1 to promise three items and the caption was the only thing telling the
+  truth.
+
 ## [0.7.1] - 2026-08-22
 
 ### Added
