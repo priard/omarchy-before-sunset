@@ -44,9 +44,23 @@ Item {
 
   // ---------------------------------------------------------------- config
 
+  // Omarchy 4.0.3 stopped handing plugins the host shell and gives them a
+  // capability-scoped API instead. That API carries the bar subtree as
+  // `barConfig` and has no `shellConfig` at all, so reading only the old name
+  // returned an empty config and the plugin reported itself unconfigured on a
+  // machine whose shell.json was perfectly intact. Take whichever the running
+  // shell offers. `barConfig` is reassigned on every config reload, so the
+  // binding stays live either way.
+  readonly property var shellConfig: {
+    if (!shell) return null
+    if (shell.shellConfig) return shell.shellConfig
+    if (shell.barConfig) return ({ bar: shell.barConfig })
+    return null
+  }
+
   // This plugin's own entry in shell.json. Re-evaluates whenever the shell
   // reloads its config, so edits take effect without restarting anything.
-  readonly property var settings: shell && shell.shellConfig ? findSettings(shell.shellConfig) : ({})
+  readonly property var settings: shellConfig ? findSettings(shellConfig) : ({})
 
   // Precedence deliberately matches shell.updateEntryInline, which is what both
   // the panel and this service write through: it targets the bar layout entry
@@ -63,6 +77,10 @@ Item {
       }
     }
 
+    // Only reachable on a shell that hands over the whole config. Under the
+    // scoped API there is nothing but `bar`, so a widget kept in `plugins[]`
+    // rather than on the bar is invisible there — which is also the one place
+    // this plugin has no bar entry to be configured from.
     var inPlugins = findInList(config ? config.plugins : null)
     return inPlugins ? inPlugins : ({})
   }
@@ -1325,8 +1343,14 @@ Item {
   // possibly an override this plugin wrote before the last restart.
   property bool barBaselineKnown: false
 
-  readonly property bool barTransparent: shell && shell.shellConfig && shell.shellConfig.bar
-    ? shell.shellConfig.bar.transparent === true : false
+  readonly property bool barTransparent: shellConfig && shellConfig.bar
+    ? shellConfig.bar.transparent === true : false
+
+  // barTransparent has to read false until the config arrives, and false is
+  // also a real value the bar can hold. Until this turns true there is no
+  // baseline to capture and nothing to compare a preference against, only a
+  // placeholder that would be mistaken for both.
+  readonly property bool barStateKnown: shellConfig && shellConfig.bar ? true : false
 
   // A transparent bar is transparent *to something*. When the wallpaper cannot
   // be painted, that something is black, while the bar's contrast helper reads
@@ -1343,8 +1367,12 @@ Item {
   }
 
   function applyBarTransparency() {
-    if (!shell || typeof shell.mutateShellConfig !== "function") return
+    if (!shell) return
     if (currentTheme === "") return
+    // Running before the config has been read would settle the baseline on the
+    // placeholder, and then the bar's real value — arriving moments later —
+    // would look like a deliberate toggle and be recorded as a preference.
+    if (!barStateKnown) return
 
     // Capture what the bar was set to before the guard overrides it. Without
     // this the override becomes the new normal: the preference would be gone by
@@ -1361,10 +1389,41 @@ Item {
 
     barBaselineKnown = true
     settingBarTransparency = true
-    shell.mutateShellConfig(function(config) {
-      if (!config.bar) config.bar = ({})
-      config.bar.transparent = want
-    })
+
+    // Omarchy 4.0.3 scoped mutateShellConfig to plugins that replace the whole
+    // bar, and returns false to everyone else. A widget is not a bar, so this
+    // is a denial to plan around rather than a bug to report: the CLI writes
+    // the same key in shell.json, the shell reloads it, and barTransparent
+    // catches up. Older shells return undefined from a write that went through,
+    // which is deliberately not treated as a refusal.
+    var mutated = typeof shell.mutateShellConfig === "function"
+      ? shell.mutateShellConfig(function(config) {
+          if (!config.bar) config.bar = ({})
+          config.bar.transparent = want
+        })
+      : false
+
+    if (mutated === false) setBarTransparencyOutOfProcess(want)
+  }
+
+  function setBarTransparencyOutOfProcess(want) {
+    // A run still in flight is for a value we have already moved past.
+    if (barTransparencyApply.running) barTransparencyApply.running = false
+    barTransparencyApply.command = [pluginFile("bin/before-sunset-transparent"),
+                                    want ? "true" : "false"]
+    barTransparencyApply.running = true
+  }
+
+  Process {
+    id: barTransparencyApply
+    // Nothing landed, so nothing will come back through barTransparent to
+    // clear the guard. Leaving it armed would make it swallow the next toggle
+    // the user actually made, and their preference would go unrecorded.
+    onExited: function(exitCode) {
+      if (exitCode === 0) return
+      console.warn("before-sunset: could not set bar transparency (exit " + exitCode + ")")
+      root.settingBarTransparency = false
+    }
   }
 
   onBarTransparentChanged: {
@@ -1391,6 +1450,10 @@ Item {
   }
 
   onWallpaperRenderableChanged: Qt.callLater(applyBarTransparency)
+
+  // The config can land after the wallpaper probe has already reported, and
+  // every earlier call bailed out for want of it. This is the one that applies.
+  onBarStateKnownChanged: Qt.callLater(applyBarTransparency)
 
   // Flipping the switch on the half of the day that is running should change
   // the bar there and then. Without this the preference was only stored and

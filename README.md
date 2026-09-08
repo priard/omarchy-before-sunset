@@ -1,6 +1,6 @@
 # Before Sunset
 
-**Version 0.7.4** · [what changed](CHANGELOG.md)
+**Version 0.7.5** · [what changed](CHANGELOG.md)
 
 Follow the sun: one Omarchy theme through the day, another through the night,
 each with its own wallpaper and its own answer to whether the top bar should be
@@ -672,6 +672,7 @@ bin/before-sunset-volume    ease the output volume to a level over a few seconds
 bin/before-sunset-nightlight  read or set the screen colour temperature
 bin/before-sunset-brightness  list the displays that can be dimmed, and dim one
 bin/before-sunset-wake      report each resume from suspend, so the theme can catch up at once
+bin/before-sunset-transparent  set the bar's transparency, from outside the shell
 ```
 
 ## Requirements and dependencies
@@ -681,7 +682,7 @@ A stock Omarchy 4. Nothing to install.
 The plugin shells out only to `bash`, `jq`, coreutils, and Omarchy's own
 commands — `omarchy-theme-set`, `omarchy-theme-bg-set`, `omarchy-theme-color`,
 `omarchy-theme-switcher`, `omarchy-menu-images`, `omarchy-audio-output-sink`,
-`omarchy-notification-send`, `omarchy-brightness-display` — plus `pactl` for
+`omarchy-notification-send`, `omarchy-brightness-display`, `omarchy-bar` — plus `pactl` for
 the volume fade, `hyprctl` for the night light and the monitor list, `gdbus`
 for the resume announcement, and `udevadm` to tell two identical displays
 apart, all part of a base install.

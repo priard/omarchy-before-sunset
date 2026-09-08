@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Sets the bar's transparency from outside the shell.
+#
+# Omarchy 4.0.3 limits the in-process config write to plugins that replace the
+# whole bar. This plugin is a widget on the stock bar, so it asks omarchy to
+# make the change the same way a user typing at a prompt would. The shell
+# reloads shell.json afterwards on its own.
+
+set -euo pipefail
+
+want="${1:-}"
+
+case "$want" in
+  true | false) ;;
+  *)
+    echo "${0##*/}: expected true or false, got '${want}'" >&2
+    exit 2
+    ;;
+esac
+
+if ! command -v omarchy-bar >/dev/null 2>&1; then
+  echo "${0##*/}: omarchy-bar is not on PATH" >&2
+  exit 3
+fi
+
+# Chatty on success, and this runs on every theme change.
+omarchy-bar transparent "$want" >/dev/null
