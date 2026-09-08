@@ -5,6 +5,48 @@ Notable changes to Before Sunset.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.5] - 2026-09-09
+
+### Fixed
+
+- **The plugin reads its settings again on Omarchy 4.0.3.** The panel opened
+  onto "choosing the slots" with both halves empty, and nothing typed into it
+  appeared to take. `shell.json` was intact the whole time — the day and night
+  themes were sitting in it exactly as configured.
+
+  Omarchy 4.0.3 stopped handing plugins the host shell object. They now get a
+  capability-scoped API that carries the bar subtree as `barConfig` and has no
+  `shellConfig` on it at all. Every read here went through that one name, so
+  the settings came back empty, every value fell to its default, and the plugin
+  concluded it had never been set up.
+
+  The writes were never lost, which is what made this so confusing to look at:
+  they went out through `updateEntryInline`, which still works, landed in
+  `shell.json`, and then came back through a read that could not see them. A
+  setting would be saved and instantly appear not to have been.
+
+  Reads now take whichever of the two the running shell offers, so one build
+  works on 4.0.3 and on the versions before it. `barConfig` is reassigned on
+  every config reload, so edits still land without a restart.
+
+- **A restart no longer records the bar's transparency as a preference for
+  whatever theme is on screen.** `barTransparent` reads false until the config
+  arrives, and false is also a value the bar can genuinely hold, so the baseline
+  was being settled on the placeholder — and the real value, landing a moment
+  later, looked exactly like someone reaching for the switch. Harmless while
+  the config could not be read at all, which is why it only surfaced once it
+  could. Nothing is captured now until there is a config to capture it from.
+
+### Changed
+
+- **Bar transparency is set through `omarchy bar transparent`.** The in-process
+  config write is scoped, as of 4.0.3, to plugins that replace the whole bar —
+  a widget on the stock bar is refused. Rather than drop the per-theme
+  transparency memory, the service now falls back to the command Omarchy
+  documents for exactly this, in `bin/before-sunset-transparent`. The refusal is
+  told apart from a write that went through, so older shells keep doing it
+  in-process and never spawn anything.
+
 ## [0.7.4] - 2026-08-23
 
 ### Fixed

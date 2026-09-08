@@ -420,7 +420,7 @@ Panel {
   // that injection ever failed, merging into an empty object would quietly wipe
   // the theme names instead of failing loudly.
   function currentEntry() {
-    var config = bar && bar.shell ? bar.shell.shellConfig : null
+    var config = shellConfig()
     if (config) {
       var layout = config.bar ? config.bar.layout : null
       if (layout) {
@@ -435,6 +435,18 @@ Panel {
     }
 
     return settings ? settings : ({})
+  }
+
+  // Omarchy 4.0.3 replaced the injected shell with a scoped API that exposes
+  // the bar subtree as `barConfig` and nothing called `shellConfig`. Same
+  // reconstruction the service does, for the same reason: a read that comes
+  // back empty here would merge every write into an empty entry.
+  function shellConfig() {
+    var shell = bar ? bar.shell : null
+    if (!shell) return null
+    if (shell.shellConfig) return shell.shellConfig
+    if (shell.barConfig) return ({ bar: shell.barConfig })
+    return null
   }
 
   function entryIn(entries) {
