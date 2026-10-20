@@ -1167,8 +1167,16 @@ Item {
     if (notifyOnChange) notify(side === "day" ? tr.t("notify.dayTheme", "Day theme") : tr.t("notify.nightTheme", "Night theme"), slug)
   }
 
+  // Notification bodies are markup, and a theme is named by whoever made it.
+  // omarchy-notification-send takes no --, so a leading dash would read as one
+  // of its options (--exec among them) rather than as text.
+  function plain(value) {
+    return String(value || "").replace(/[<>&\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "")
+      .replace(/^-+/, "").substring(0, 120)
+  }
+
   function notify(title, body) {
-    notifyProcess.command = ["omarchy-notification-send", title, body, "-t", "2000"]
+    notifyProcess.command = ["omarchy-notification-send", "-t", "2000", plain(title), plain(body)]
     notifyProcess.running = true
   }
 
