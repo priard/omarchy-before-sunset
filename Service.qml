@@ -23,6 +23,8 @@ Item {
   property var shell: null
   property var manifest: null
 
+  Strings { id: tr }
+
   readonly property string pluginId: "priard.before-sunset"
   readonly property string home: Quickshell.env("HOME")
   readonly property string stateDir: home + "/.local/state/omarchy"
@@ -598,7 +600,8 @@ Item {
     ])
 
     if (notifyOnChange)
-      notify(newSide === "night" ? "Quieting down" : "Back up", "Volume easing to " + target + "%")
+      notify(newSide === "night" ? tr.t("notify.volumeDown", "Quieting down") : tr.t("notify.volumeUp", "Back up"),
+             tr.t("notify.volumeBody", "Volume easing to %1%").arg(target))
   }
 
   // ----------------------------------------------------------- brightness
@@ -1161,7 +1164,7 @@ Item {
     themeProcess.command = [pluginFile("bin/before-sunset-apply"), slug, rememberedBackground(slug)]
     themeProcess.running = true
 
-    if (notifyOnChange) notify(side === "day" ? "Day theme" : "Night theme", slug)
+    if (notifyOnChange) notify(side === "day" ? tr.t("notify.dayTheme", "Day theme") : tr.t("notify.nightTheme", "Night theme"), slug)
   }
 
   function notify(title, body) {
@@ -1187,7 +1190,7 @@ Item {
     persist(changes)
 
     if (notifyOnChange)
-      notify(activeSlot === "dayTheme" ? "Day theme set" : "Night theme set", slug)
+      notify(activeSlot === "dayTheme" ? tr.t("notify.dayThemeSet", "Day theme set") : tr.t("notify.nightThemeSet", "Night theme set"), slug)
   }
 
   // Pinning is the honest way to override a schedule: it is visible in the

@@ -20,6 +20,8 @@ Panel {
   // loader, which may finish after the bar has already built its widgets.
   property var service: null
 
+  Strings { id: tr }
+
   function resolveService() {
     if (service) return
     if (!bar || !bar.shell || typeof bar.shell.serviceFor !== "function") return
@@ -60,14 +62,14 @@ Panel {
     && (autoSource === "sun" || autoSource === "fixed")
 
   readonly property string timetableNote: {
-    if (configMode === "off") return "The plugin is off, so nothing moves this."
+    if (configMode === "off") return tr.t("note.off", "The plugin is off, so nothing moves this.")
     if (!scheduleRunning)
-      return "A half is pinned, so the schedule is not running and this does not move. "
+      return tr.t("note.pinned", "A half is pinned, so the schedule is not running and this does not move. "
         + "Switch back to Auto and it lands on the half of the day that is running, "
-        + "without waiting for the next turn."
+        + "without waiting for the next turn.")
     if (onATimetable) return ""
-    return "The light sensor says whether the room is dark, not when it will turn. "
-      + "With no turn to move on, this stays where you leave it."
+    return tr.t("note.sensor", "The light sensor says whether the room is dark, not when it will turn. "
+      + "With no turn to move on, this stays where you leave it.")
   }
 
   readonly property bool sensorAvailable: service ? service.sensorAvailable === true : false
@@ -83,7 +85,7 @@ Panel {
   // otherwise indistinguishable, and what they currently read is the only thing
   // that tells them apart.
   readonly property var sensorDeviceOptions: {
-    var options = [{ value: "", label: "Average of all sensors" }]
+    var options = [{ value: "", label: tr.t("sensor.average", "Average of all sensors") }]
     for (var i = 0; i < sensorDevices.length; i++) {
       var device = sensorDevices[i]
       options.push({
@@ -105,9 +107,9 @@ Panel {
 
   readonly property var scheduleOptions: {
     var options = []
-    if (hasLocation) options.push({ value: "sun", label: "Sun" })
-    options.push({ value: "fixed", label: "Fixed hours" })
-    if (sensorAvailable) options.push({ value: "sensor", label: "Light sensor" })
+    if (hasLocation) options.push({ value: "sun", label: tr.t("schedule.sun", "Sun") })
+    options.push({ value: "fixed", label: tr.t("schedule.fixed", "Fixed hours") })
+    if (sensorAvailable) options.push({ value: "sensor", label: tr.t("schedule.sensor", "Light sensor") })
     return options
   }
 
@@ -132,14 +134,14 @@ Panel {
     if (!service) return ""
 
     if (effectiveAutoMode === "sun")
-      return "Sun · " + clockOf(service.todaySunrise) + " – " + clockOf(service.todaySunset)
+      return tr.t("schedule.summary.sun", "Sun · %1 – %2").arg(clockOf(service.todaySunrise)).arg(clockOf(service.todaySunset))
 
     if (effectiveAutoMode === "fixed")
-      return "Fixed · " + fixedDay + " – " + fixedNight
+      return tr.t("schedule.summary.fixed", "Fixed · %1 – %2").arg(fixedDay).arg(fixedNight)
 
     if (effectiveAutoMode === "sensor")
-      return sensorThreshold > 0 ? "Light sensor · above " + Math.round(sensorThreshold)
-        : "Light sensor · not calibrated"
+      return sensorThreshold > 0 ? tr.t("schedule.summary.sensor", "Light sensor · above %1").arg(Math.round(sensorThreshold))
+        : tr.t("schedule.summary.sensorUncalibrated", "Light sensor · not calibrated")
 
     return ""
   }
@@ -175,22 +177,22 @@ Panel {
   }
 
   readonly property string nightlightSummary: {
-    if (nightlightMode === "off") return "Off"
-    if (nightlightMode === "on") return "Always " + nightlightNight + " K"
+    if (nightlightMode === "off") return tr.t("common.off", "Off")
+    if (nightlightMode === "on") return tr.t("nightlight.summary.on", "Always %1 K").arg(nightlightNight)
     if (nightlightSource === "fixed")
-      return nightlightNight + " K from " + nightlightFixedNight
-    return nightlightNight + " K over " + nightlightTransitionMinutes + " min"
+      return tr.t("nightlight.summary.fixed", "%1 K from %2").arg(nightlightNight).arg(nightlightFixedNight)
+    return tr.t("nightlight.summary.auto", "%1 K over %2 min").arg(nightlightNight).arg(nightlightTransitionMinutes)
   }
 
   // A rough guide, because kelvin means nothing to most people until they have
   // seen it on their own screen.
   readonly property string nightlightStrength: {
     var k = nightlightNight
-    if (k >= 5500) return "barely there"
-    if (k >= 4500) return "gentle"
-    if (k >= 3800) return "comfortable"
-    if (k >= 3000) return "strong"
-    return "very strong"
+    if (k >= 5500) return tr.t("nightlight.strength.barely", "barely there")
+    if (k >= 4500) return tr.t("nightlight.strength.gentle", "gentle")
+    if (k >= 3800) return tr.t("nightlight.strength.comfortable", "comfortable")
+    if (k >= 3000) return tr.t("nightlight.strength.strong", "strong")
+    return tr.t("nightlight.strength.veryStrong", "very strong")
   }
 
   readonly property int nightVolume: service ? service.nightVolume : -1
@@ -257,11 +259,11 @@ Panel {
   }
 
   readonly property string brightnessSummary: {
-    if (!brightnessAvailable) return "No display answers"
-    if (nightBrightness < 0 && dayBrightness < 0) return "Off"
-    if (nightBrightness >= 0 && dayBrightness >= 0) return "Night " + nightBrightness + "% · day " + dayBrightness + "%"
-    if (nightBrightness >= 0) return "Night · " + nightBrightness + "%"
-    return "Day · " + dayBrightness + "%"
+    if (!brightnessAvailable) return tr.t("brightness.noDisplay", "No display answers")
+    if (nightBrightness < 0 && dayBrightness < 0) return tr.t("common.off", "Off")
+    if (nightBrightness >= 0 && dayBrightness >= 0) return tr.t("level.both", "Night %1% · day %2%").arg(nightBrightness).arg(dayBrightness)
+    if (nightBrightness >= 0) return tr.t("level.night", "Night · %1%").arg(nightBrightness)
+    return tr.t("level.day", "Day · %1%").arg(dayBrightness)
   }
 
   // Which level is worth a line: the one in force now if it is set, and the one
@@ -271,10 +273,10 @@ Panel {
     var atNight = side === "night"
 
     var here = atNight ? nightLevel : dayLevel
-    if (here >= 0) return here + (atNight ? "% at night" : "% at day")
+    if (here >= 0) return (atNight ? tr.t("level.atNight", "%1% at night") : tr.t("level.atDay", "%1% at day")).arg(here)
 
     var coming = atNight ? dayLevel : nightLevel
-    if (coming >= 0) return coming + (atNight ? "% at day" : "% at night")
+    if (coming >= 0) return (atNight ? tr.t("level.atDay", "%1% at day") : tr.t("level.atNight", "%1% at night")).arg(coming)
 
     return ""
   }
@@ -283,22 +285,22 @@ Panel {
   readonly property string volumeNote: levelNote(nightVolume, dayVolume)
 
   readonly property string volumeSummary: {
-    if (nightVolume < 0 && dayVolume < 0) return "Off"
-    if (nightVolume >= 0 && dayVolume >= 0) return "Night " + nightVolume + "% · day " + dayVolume + "%"
-    if (nightVolume >= 0) return "Night · " + nightVolume + "%"
-    return "Day · " + dayVolume + "%"
+    if (nightVolume < 0 && dayVolume < 0) return tr.t("common.off", "Off")
+    if (nightVolume >= 0 && dayVolume >= 0) return tr.t("level.both", "Night %1% · day %2%").arg(nightVolume).arg(dayVolume)
+    if (nightVolume >= 0) return tr.t("level.night", "Night · %1%").arg(nightVolume)
+    return tr.t("level.day", "Day · %1%").arg(dayVolume)
   }
 
   readonly property string sensorExplanation: {
-    if (!sensorRead) return "Waiting for the first reading."
+    if (!sensorRead) return tr.t("sensor.waiting", "Waiting for the first reading.")
     if (sensorThreshold <= 0)
-      return "No threshold set, so the sun or fixed hours are running instead. "
-        + "Cover the sensor until it reads dark, then press Set from now."
+      return tr.t("sensor.noThreshold", "No threshold set, so the sun or fixed hours are running instead. "
+        + "Cover the sensor until it reads dark, then press Set from now.")
     if (sensorPending !== "")
-      return "Reading suggests " + sensorPending + "; holding until it stays there."
+      return tr.t("sensor.pending", "Reading suggests %1; holding until it stays there.").arg(tr.t("side." + sensorPending, sensorPending))
     var side = service ? String(service.sensorSide) : ""
-    if (side === "") return "Undecided — the reading sits inside the neutral band."
-    return "Above " + Math.round(sensorThreshold) + " is day, below is night. Currently " + side + "."
+    if (side === "") return tr.t("sensor.undecided", "Undecided — the reading sits inside the neutral band.")
+    return tr.t("sensor.explanation", "Above %1 is day, below is night. Currently %2.").arg(Math.round(sensorThreshold)).arg(tr.t("side." + side, side))
   }
 
   // Redrawn every half minute while the panel is open: the timeline's "now"
@@ -348,8 +350,8 @@ Panel {
     if (!service || !hasLocation) return ""
     var rise = clockOf(service.todaySunrise)
     var set = clockOf(service.todaySunset)
-    if (rise === "" || set === "") return locationName + " — no sunrise or sunset today"
-    return (locationName !== "" ? locationName + " — " : "") + "sunrise " + rise + ", sunset " + set
+    if (rise === "" || set === "") return tr.t("sun.none", "%1 — no sunrise or sunset today").arg(locationName)
+    return (locationName !== "" ? locationName + " — " : "") + tr.t("sun.times", "sunrise %1, sunset %2").arg(rise).arg(set)
   }
 
   // Other Omarchy panels put a rotating line where a status would be redundant,
@@ -365,13 +367,13 @@ Panel {
   // and thirty more. Sounding like the network panel with different nouns would
   // be the joke wearing someone else's coat.
   readonly property var idlePhrases: [
-    "Consulting the almanac",
-    "Reading the twilights",
-    "Reckoning the hours",
-    "Halving the day",
-    "Chasing the terminator",
-    "Solving for dusk",
-    "Minding the horizon"
+    tr.t("hero.idle.1", "Consulting the almanac"),
+    tr.t("hero.idle.2", "Reading the twilights"),
+    tr.t("hero.idle.3", "Reckoning the hours"),
+    tr.t("hero.idle.4", "Halving the day"),
+    tr.t("hero.idle.5", "Chasing the terminator"),
+    tr.t("hero.idle.6", "Solving for dusk"),
+    tr.t("hero.idle.7", "Minding the horizon")
   ]
 
   property int phraseIndex: 0
@@ -379,14 +381,14 @@ Panel {
   // The badge is the terse version, because it sits beside a title and has to
   // leave room for it. The full sentence stays on the bar widget's tooltip.
   readonly property string heroBadge: {
-    if (!service) return "NO SERVICE"
-    if (!service.configured) return "SETTING UP"
-    if (configMode === "off") return "OFF"
-    if (configMode === "day" || configMode === "night") return "PINNED · " + configMode.toUpperCase()
-    if (side === "") return "AUTO"
+    if (!service) return tr.t("hero.badge.noService", "NO SERVICE")
+    if (!service.configured) return tr.t("hero.badge.settingUp", "SETTING UP")
+    if (configMode === "off") return tr.t("hero.badge.off", "OFF")
+    if (configMode === "day" || configMode === "night") return tr.t("hero.badge.pinned", "PINNED · %1").arg(tr.t("side." + configMode, configMode).toUpperCase())
+    if (side === "") return tr.t("hero.badge.auto", "AUTO")
     // An arrow rather than a separator: the time is not a property of the half
     // that is running, it is where the half is going.
-    return side.toUpperCase() + (nextTransition ? " \u2192 " + clockOf(nextTransition) : "")
+    return tr.t("side." + side, side).toUpperCase() + (nextTransition ? " \u2192 " + clockOf(nextTransition) : "")
   }
 
   // Nothing rotates outside Auto: holding a half is a state worth naming once,
@@ -394,21 +396,21 @@ Panel {
   // plugin is up to something it is deliberately not up to.
   readonly property string heroLine: {
     if (!service) return ""
-    if (!service.configured) return "Choosing the slots"
-    if (configMode === "off") return "Standing by"
-    if (configMode === "day") return "Holding the day"
-    if (configMode === "night") return "Holding the night"
+    if (!service.configured) return tr.t("hero.line.settingUp", "Choosing the slots")
+    if (configMode === "off") return tr.t("hero.line.off", "Standing by")
+    if (configMode === "day") return tr.t("hero.line.day", "Holding the day")
+    if (configMode === "night") return tr.t("hero.line.night", "Holding the night")
     return idlePhrases.length > 0 ? idlePhrases[phraseIndex % idlePhrases.length] : ""
   }
 
   readonly property string heroMeta: {
-    if (!service) return "SERVICE NOT LOADED"
-    if (!service.configured) return "SETTING UP"
-    if (configMode === "off") return "OFF"
-    if (configMode === "day" || configMode === "night") return "PINNED — " + configMode.toUpperCase()
+    if (!service) return tr.t("hero.meta.noService", "SERVICE NOT LOADED")
+    if (!service.configured) return tr.t("hero.badge.settingUp", "SETTING UP")
+    if (configMode === "off") return tr.t("hero.badge.off", "OFF")
+    if (configMode === "day" || configMode === "night") return tr.t("hero.meta.pinned", "PINNED — %1").arg(tr.t("side." + configMode, configMode).toUpperCase())
 
-    var until = nextTransition ? " UNTIL " + clockOf(nextTransition) : ""
-    return side.toUpperCase() + until
+    var now = tr.t("side." + side, side).toUpperCase()
+    return nextTransition ? tr.t("hero.meta.until", "%1 UNTIL %2").arg(now).arg(clockOf(nextTransition)) : now
   }
 
   // --------------------------------------------------------- persistence
@@ -1081,7 +1083,7 @@ Panel {
 
         Text {
           visible: card.mode !== ""
-          text: "(" + card.mode + ")"
+          text: "(" + tr.t("themeMode." + card.mode, card.mode) + ")"
           color: root.dim
           font.family: root.face
           font.pixelSize: Style.font.caption
@@ -1089,7 +1091,7 @@ Panel {
 
         Text {
           visible: card.inForce
-          text: "· now"
+          text: tr.t("slot.now", "· now")
           color: root.dim
           font.family: root.face
           font.pixelSize: Style.font.caption
@@ -1101,7 +1103,7 @@ Panel {
         anchors.right: barSwitch.left
         anchors.rightMargin: Style.space(8)
         anchors.verticalCenter: parent.verticalCenter
-        text: "transparent bar"
+        text: tr.t("slot.transparentBar", "transparent bar")
         color: root.dim
         font.family: root.face
         font.pixelSize: Style.font.caption
@@ -1125,16 +1127,16 @@ Panel {
       Thumb {
         width: (parent.width - Style.space(10)) / 2
         source: card.previewPath
-        caption: card.slug === "" ? "Choose a theme" : root.displayName(card.slug)
-        fallback: card.slug === "" ? "Choose a theme" : root.displayName(card.slug)
+        caption: card.slug === "" ? tr.t("slot.chooseTheme", "Choose a theme") : root.displayName(card.slug)
+        fallback: card.slug === "" ? tr.t("slot.chooseTheme", "Choose a theme") : root.displayName(card.slug)
         onActivated: root.pickTheme(card.slot, card.slug)
       }
 
       Thumb {
         width: (parent.width - Style.space(10)) / 2
         source: card.backgroundPath
-        caption: card.backgroundName === "" ? "No background" : card.backgroundName
-        fallback: "No background"
+        caption: card.backgroundName === "" ? tr.t("slot.noBackground", "No background") : card.backgroundName
+        fallback: tr.t("slot.noBackground", "No background")
         onActivated: root.pickBackground(card.slug, card.backgroundName)
       }
     }
@@ -1302,8 +1304,8 @@ Panel {
               }
 
               Text {
-                text: root.nightlightHeld ? root.nightlightActual + " K held"
-                  : (root.nightlightActual > 0 ? root.nightlightActual + " K" : "night light")
+                text: root.nightlightHeld ? tr.t("status.nightlightHeld", "%1 K held").arg(root.nightlightActual)
+                  : (root.nightlightActual > 0 ? tr.t("status.kelvin", "%1 K").arg(root.nightlightActual) : tr.t("status.nightlight", "night light"))
                 color: root.dim
                 font.family: root.face
                 font.pixelSize: Style.font.caption
@@ -1363,7 +1365,7 @@ Panel {
             spacing: Style.space(10)
 
             PanelSectionHeader {
-              text: "MODE"
+              text: tr.t("mode.title", "MODE")
               foreground: root.fg
               fontFamily: root.face
             }
@@ -1371,9 +1373,9 @@ Panel {
             ButtonGroup {
               width: parent.width
               options: [
-                { value: "day", label: "Day" },
-                { value: "night", label: "Night" },
-                { value: "auto", label: "Auto" }
+                { value: "day", label: tr.t("mode.day", "Day") },
+                { value: "night", label: tr.t("mode.night", "Night") },
+                { value: "auto", label: tr.t("mode.auto", "Auto") }
               ]
               value: root.configMode === "off" ? "" : root.configMode
               foreground: root.fg
@@ -1384,8 +1386,8 @@ Panel {
             Text {
               visible: root.configMode === "day" || root.configMode === "night"
               width: parent.width
-              text: "Pinned. The theme is not following the schedule; switch to Auto to "
-                + "hand it back."
+              text: tr.t("mode.pinnedNote", "Pinned. The theme is not following the schedule; switch to Auto to "
+                + "hand it back.")
               color: root.dim
               font.family: root.face
               font.pixelSize: Style.font.caption
@@ -1403,15 +1405,15 @@ Panel {
             width: parent.width
             spacing: Style.space(16)
 
-            SlotCard { label: "DAY"; slot: "dayTheme"; slug: root.dayTheme }
-            SlotCard { label: "NIGHT"; slot: "nightTheme"; slug: root.nightTheme }
+            SlotCard { label: tr.t("slot.day", "DAY"); slot: "dayTheme"; slug: root.dayTheme }
+            SlotCard { label: tr.t("slot.night", "NIGHT"); slot: "nightTheme"; slug: root.nightTheme }
 
             Text {
               visible: !root.wallpaperRenderable
               width: parent.width
-              text: "This wallpaper is in a format Qt cannot decode here, so the desktop "
+              text: tr.t("slot.undecodable", "This wallpaper is in a format Qt cannot decode here, so the desktop "
                 + "paints black behind a transparent bar. Transparency is held off until "
-                + "it can render; the preference above is kept."
+                + "it can render; the preference above is kept.")
               color: root.fg
               font.family: root.face
               font.pixelSize: Style.font.caption
@@ -1432,15 +1434,15 @@ Panel {
             // taking its own explanation with it.
             visible: root.configMode !== "off"
             muted: !root.scheduleRunning
-            title: "SCHEDULE"
+            title: tr.t("schedule.title", "SCHEDULE")
             summary: root.scheduleSummary
 
             Text {
               visible: root.configMode === "day" || root.configMode === "night"
               width: parent.width
-              text: "Pinned, so the schedule is not running: nothing here moves the "
+              text: tr.t("schedule.pinnedNote", "Pinned, so the schedule is not running: nothing here moves the "
                 + "theme, the brightness or the volume until Auto takes over. The night "
-                + "light keeps going, because it has hours of its own."
+                + "light keeps going, because it has hours of its own.")
               color: root.dim
               font.family: root.face
               font.pixelSize: Style.font.caption
@@ -1460,8 +1462,8 @@ Panel {
             Text {
               visible: !root.hasLocation
               width: parent.width
-              text: "Sunrise and sunset need a location. Set one in the Weather widget, "
-                + "or run:\nomarchy-weather-location --set \"City\" lat,lon"
+              text: tr.t("schedule.needsLocation", "Sunrise and sunset need a location. Set one in the Weather widget, "
+                + "or run:\nomarchy-weather-location --set \"City\" lat,lon")
               color: root.dim
               font.family: root.face
               font.pixelSize: Style.font.caption
@@ -1492,12 +1494,12 @@ Panel {
 
               Dropdown {
                 width: parent.width
-                label: "Boundary"
+                label: tr.t("schedule.boundary", "Boundary")
                 options: [
-                  { value: "official", label: "Horizon (sunrise/sunset)" },
-                  { value: "civil", label: "Civil twilight" },
-                  { value: "nautical", label: "Nautical twilight" },
-                  { value: "astronomical", label: "Astronomical twilight" }
+                  { value: "official", label: tr.t("schedule.boundary.official", "Horizon (sunrise/sunset)") },
+                  { value: "civil", label: tr.t("schedule.boundary.civil", "Civil twilight") },
+                  { value: "nautical", label: tr.t("schedule.boundary.nautical", "Nautical twilight") },
+                  { value: "astronomical", label: tr.t("schedule.boundary.astronomical", "Astronomical twilight") }
                 ]
                 value: root.twilight
                 foreground: root.fg
@@ -1513,7 +1515,7 @@ Panel {
                 spacing: Style.space(12)
 
                 NumberField {
-                  label: "Sunrise ± min"
+                  label: tr.t("schedule.sunriseOffset", "Sunrise ± min")
                   value: root.sunriseOffsetMinutes
                   from: -180
                   to: 180
@@ -1524,7 +1526,7 @@ Panel {
                 }
 
                 NumberField {
-                  label: "Sunset ± min"
+                  label: tr.t("schedule.sunsetOffset", "Sunset ± min")
                   value: root.sunsetOffsetMinutes
                   from: -180
                   to: 180
@@ -1547,7 +1549,7 @@ Panel {
                 spacing: Style.space(6)
 
                 Text {
-                  text: "Day from"
+                  text: tr.t("schedule.dayFrom", "Day from")
                   color: root.dim
                   font.family: root.face
                   font.pixelSize: Style.font.caption
@@ -1569,7 +1571,7 @@ Panel {
                 spacing: Style.space(6)
 
                 Text {
-                  text: "Night from"
+                  text: tr.t("schedule.nightFrom", "Night from")
                   color: root.dim
                   font.family: root.face
                   font.pixelSize: Style.font.caption
@@ -1596,7 +1598,7 @@ Panel {
               Dropdown {
                 visible: root.sensorDevices.length > 1
                 width: parent.width
-                label: "Sensor"
+                label: tr.t("sensor.device", "Sensor")
                 options: root.sensorDeviceOptions
                 value: root.sensorDevice
                 foreground: root.fg
@@ -1607,8 +1609,8 @@ Panel {
               Text {
                 visible: root.sensorDevices.length > 1
                 width: parent.width
-                text: "Sensors read differently from one another, so check the threshold "
-                  + "after switching between them."
+                text: tr.t("sensor.switchNote", "Sensors read differently from one another, so check the threshold "
+                  + "after switching between them.")
                 color: root.dim
                 font.family: root.face
                 font.pixelSize: Style.font.caption
@@ -1623,7 +1625,7 @@ Panel {
                   id: readingLabel
                   anchors.left: parent.left
                   anchors.verticalCenter: parent.verticalCenter
-                  text: root.sensorRead ? "Light now: " + root.sensorValue : "Reading…"
+                  text: root.sensorRead ? tr.t("sensor.now", "Light now: %1").arg(root.sensorValue) : tr.t("sensor.reading", "Reading…")
                   color: root.dim
                   font.family: root.face
                   font.pixelSize: Style.font.caption
@@ -1637,7 +1639,7 @@ Panel {
                   id: calibrate
                   anchors.right: parent.right
                   anchors.verticalCenter: parent.verticalCenter
-                  text: "Set from now"
+                  text: tr.t("sensor.setFromNow", "Set from now")
                   bordered: true
                   enabled: root.sensorRead
                   foreground: root.fg
@@ -1651,7 +1653,7 @@ Panel {
                 spacing: Style.space(12)
 
                 NumberField {
-                  label: "Threshold"
+                  label: tr.t("sensor.threshold", "Threshold")
                   value: Math.round(root.sensorThreshold)
                   from: 0
                   to: 1000000
@@ -1662,7 +1664,7 @@ Panel {
                 }
 
                 NumberField {
-                  label: "Hold for (s)"
+                  label: tr.t("sensor.dwell", "Hold for (s)")
                   value: root.sensorDwellSeconds
                   from: 0
                   to: 600
@@ -1689,15 +1691,15 @@ Panel {
           // ----------------------------------------------- night light
 
           Disclosure {
-            title: "NIGHT LIGHT"
+            title: tr.t("nightlight.title", "NIGHT LIGHT")
             summary: root.nightlightSummary
 
             ButtonGroup {
               width: parent.width
               options: [
-                { value: "off", label: "Off" },
-                { value: "auto", label: "Auto" },
-                { value: "on", label: "Always" }
+                { value: "off", label: tr.t("common.off", "Off") },
+                { value: "auto", label: tr.t("mode.auto", "Auto") },
+                { value: "on", label: tr.t("nightlight.always", "Always") }
               ]
               value: root.nightlightMode
               foreground: root.fg
@@ -1708,14 +1710,14 @@ Panel {
             Text {
               width: parent.width
               text: {
-                var now = root.nightlightActual > 0 ? "Screen is at " + root.nightlightActual + " K. " : ""
+                var now = root.nightlightActual > 0 ? tr.t("nightlight.now", "Screen is at %1 K.").arg(root.nightlightActual) + " " : ""
                 if (root.nightlightHeld)
-                  return now + "Held where you put it until the day next turns over."
+                  return now + tr.t("nightlight.note.held", "Held where you put it until the day next turns over.")
                 if (root.nightlightMode === "off")
-                  return now + "Omarchy's own toggle is left to behave exactly as it always has."
+                  return now + tr.t("nightlight.note.off", "Omarchy's own toggle is left to behave exactly as it always has.")
                 if (root.nightlightMode === "on")
-                  return now + "Held warm around the clock, whatever the day is doing."
-                return now + "Follows the day on its own — pinning a theme does not stop it."
+                  return now + tr.t("nightlight.note.on", "Held warm around the clock, whatever the day is doing.")
+                return now + tr.t("nightlight.note.auto", "Follows the day on its own — pinning a theme does not stop it.")
               }
               color: root.dim
               font.family: root.face
@@ -1727,8 +1729,8 @@ Panel {
               visible: root.nightlightMode === "auto"
               width: parent.width
               options: [
-                { value: "schedule", label: "Follow the schedule" },
-                { value: "fixed", label: "Own hours" }
+                { value: "schedule", label: tr.t("nightlight.source.schedule", "Follow the schedule") },
+                { value: "fixed", label: tr.t("nightlight.source.fixed", "Own hours") }
               ]
               value: root.nightlightSource
               foreground: root.fg
@@ -1745,7 +1747,7 @@ Panel {
                 spacing: Style.space(6)
 
                 Text {
-                  text: "Neutral from"
+                  text: tr.t("nightlight.neutralFrom", "Neutral from")
                   color: root.dim
                   font.family: root.face
                   font.pixelSize: Style.font.caption
@@ -1765,7 +1767,7 @@ Panel {
                 spacing: Style.space(6)
 
                 Text {
-                  text: "Warm from"
+                  text: tr.t("nightlight.warmFrom", "Warm from")
                   color: root.dim
                   font.family: root.face
                   font.pixelSize: Style.font.caption
@@ -1796,7 +1798,7 @@ Panel {
               spacing: Style.space(12)
 
               NumberField {
-                label: "Night K"
+                label: tr.t("nightlight.nightK", "Night K")
                 value: root.nightlightNight
                 from: 1500
                 to: 6500
@@ -1807,7 +1809,7 @@ Panel {
               }
 
               NumberField {
-                label: "Day K"
+                label: tr.t("nightlight.dayK", "Day K")
                 value: root.nightlightDay
                 from: 3000
                 to: 20000
@@ -1824,7 +1826,7 @@ Panel {
               spacing: Style.space(12)
 
               NumberField {
-                label: "Over (min)"
+                label: tr.t("nightlight.over", "Over (min)")
                 value: root.nightlightTransitionMinutes
                 from: 1
                 to: 360
@@ -1835,7 +1837,7 @@ Panel {
               }
 
               NumberField {
-                label: "Start early (min)"
+                label: tr.t("nightlight.lead", "Start early (min)")
                 value: root.nightlightLeadMinutes
                 from: 0
                 to: 360
@@ -1849,10 +1851,7 @@ Panel {
             Text {
               visible: root.nightlightEnabled
               width: parent.width
-              text: root.nightlightNight + " K is " + root.nightlightStrength
-                + ". 6500 K is neutral, 5000 barely shows, 4000 is comfortable for an "
-                + "evening, below 3000 most people find too much. The change is spread "
-                + "over the whole window, so no single minute of it is visible."
+              text: tr.t("nightlight.guide", "%1 K is %2. 6500 K is neutral, 5000 barely shows, 4000 is comfortable for an evening, below 3000 most people find too much. The change is spread over the whole window, so no single minute of it is visible.").arg(root.nightlightNight).arg(root.nightlightStrength)
               color: root.dim
               font.family: root.face
               font.pixelSize: Style.font.caption
@@ -1861,8 +1860,8 @@ Panel {
 
             Text {
               width: parent.width
-              text: "Shares the night light with Omarchy's own toggle: switching it on there "
-                + "hands the schedule the wheel, switching it off takes it back."
+              text: tr.t("nightlight.sharedNote", "Shares the night light with Omarchy's own toggle: switching it on there "
+                + "hands the schedule the wheel, switching it off takes it back.")
               color: root.dim
               font.family: root.face
               font.pixelSize: Style.font.caption
@@ -1877,7 +1876,7 @@ Panel {
           Disclosure {
             id: brightnessSection
 
-            title: "BRIGHTNESS"
+            title: tr.t("brightness.title", "BRIGHTNESS")
             summary: root.brightnessSummary
             muted: !root.onATimetable
             // Nothing is drawn on a machine where no display answers, the same
@@ -1902,7 +1901,7 @@ Panel {
                 id: dimLabel
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Dim at nightfall"
+                text: tr.t("brightness.dim", "Dim at nightfall")
                 color: root.dim
                 font.family: root.face
                 font.pixelSize: Style.font.caption
@@ -1924,7 +1923,7 @@ Panel {
               spacing: Style.space(12)
 
               NumberField {
-                label: "Night level %"
+                label: tr.t("common.nightLevel", "Night level %")
                 value: Math.max(0, root.nightBrightness)
                 from: 5
                 to: 100
@@ -1935,7 +1934,7 @@ Panel {
               }
 
               NumberField {
-                label: "Fade (s)"
+                label: tr.t("common.fade", "Fade (s)")
                 value: root.brightnessFadeSeconds
                 from: 0
                 to: 300
@@ -1954,7 +1953,7 @@ Panel {
                 id: liftLabel
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Brighten at daybreak"
+                text: tr.t("brightness.brighten", "Brighten at daybreak")
                 color: root.dim
                 font.family: root.face
                 font.pixelSize: Style.font.caption
@@ -1972,7 +1971,7 @@ Panel {
 
             NumberField {
               visible: root.dayBrightness >= 0
-              label: "Day level %"
+              label: tr.t("common.dayLevel", "Day level %")
               value: Math.max(0, root.dayBrightness)
               from: 5
               to: 100
@@ -1986,8 +1985,9 @@ Panel {
             // most people and a list of displays would be the first thing they
             // had to read past to find it.
             Disclosure {
-              title: "Per display"
-              summary: root.brightnessTargets.length + (root.brightnessTargets.length === 1 ? " display" : " displays")
+              title: tr.t("brightness.perDisplay", "Per display")
+              summary: tr.tn("brightness.displays", root.brightnessTargets.length,
+                root.brightnessTargets.length === 1 ? "%1 display" : "%1 displays").arg(root.brightnessTargets.length)
 
               Repeater {
                 model: root.brightnessTargets
@@ -2019,7 +2019,7 @@ Panel {
 
                       Text {
                         width: parent.width
-                        text: String(displayRow.modelData.label || "Display")
+                        text: String(displayRow.modelData.label || tr.t("brightness.display", "Display"))
                         color: root.fg
                         font.family: root.face
                         font.pixelSize: Style.font.caption
@@ -2031,8 +2031,8 @@ Panel {
                         // The live reading is what tells two identical displays
                         // apart. Apple's have no connector to name them by, so
                         // the number they are sitting at is the only handle.
-                        text: (displayRow.overridden ? "Its own numbers" : "Follows the pair above")
-                          + " · now " + displayRow.modelData.value + "%"
+                        text: (displayRow.overridden ? tr.t("brightness.ownNumbers", "Its own numbers") : tr.t("brightness.followsPair", "Follows the pair above"))
+                          + " · " + tr.t("brightness.now", "now %1%").arg(displayRow.modelData.value)
                         color: root.dim
                         font.family: root.face
                         font.pixelSize: Style.font.caption
@@ -2064,7 +2064,7 @@ Panel {
                     spacing: Style.space(12)
 
                     NumberField {
-                      label: "Night %"
+                      label: tr.t("brightness.nightPercent", "Night %")
                       value: Math.max(0, displayRow.ownNight)
                       from: 5
                       to: 100
@@ -2077,7 +2077,7 @@ Panel {
                     }
 
                     NumberField {
-                      label: "Day %"
+                      label: tr.t("brightness.dayPercent", "Day %")
                       value: Math.max(0, displayRow.ownDay)
                       from: 5
                       to: 100
@@ -2095,9 +2095,9 @@ Panel {
 
             Text {
               width: parent.width
-              text: "Only the sun and fixed hours move the brightness, and only when they "
+              text: tr.t("brightness.note", "Only the sun and fixed hours move the brightness, and only when they "
                 + "turn the day over. Night never raises it and day never lowers it, so a "
-                + "screen you turned down yourself stays where you put it."
+                + "screen you turned down yourself stays where you put it.")
               color: root.dim
               font.family: root.face
               font.pixelSize: Style.font.caption
@@ -2106,8 +2106,8 @@ Panel {
 
             Text {
               width: parent.width
-              text: "Displays that cannot be driven are not listed. A monitor with no DDC, "
-                + "or one whose firmware refuses, is left alone rather than reported broken."
+              text: tr.t("brightness.undrivenNote", "Displays that cannot be driven are not listed. A monitor with no DDC, "
+                + "or one whose firmware refuses, is left alone rather than reported broken.")
               color: root.dim
               font.family: root.face
               font.pixelSize: Style.font.caption
@@ -2120,7 +2120,7 @@ Panel {
           // ---------------------------------------------------- volume
 
           Disclosure {
-            title: "VOLUME"
+            title: tr.t("volume.title", "VOLUME")
             summary: root.volumeSummary
             muted: !root.onATimetable
 
@@ -2143,7 +2143,7 @@ Panel {
                 id: nightLabel
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Ease down at nightfall"
+                text: tr.t("volume.down", "Ease down at nightfall")
                 color: root.dim
                 font.family: root.face
                 font.pixelSize: Style.font.caption
@@ -2165,7 +2165,7 @@ Panel {
               spacing: Style.space(12)
 
               NumberField {
-                label: "Night level %"
+                label: tr.t("common.nightLevel", "Night level %")
                 value: Math.max(0, root.nightVolume)
                 from: 0
                 to: 100
@@ -2176,7 +2176,7 @@ Panel {
               }
 
               NumberField {
-                label: "Fade (s)"
+                label: tr.t("common.fade", "Fade (s)")
                 value: root.volumeFadeSeconds
                 from: 0
                 to: 300
@@ -2195,7 +2195,7 @@ Panel {
                 id: dayLabel
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Ease back up at daybreak"
+                text: tr.t("volume.up", "Ease back up at daybreak")
                 color: root.dim
                 font.family: root.face
                 font.pixelSize: Style.font.caption
@@ -2213,7 +2213,7 @@ Panel {
 
             NumberField {
               visible: root.dayVolume >= 0
-              label: "Day level %"
+              label: tr.t("common.dayLevel", "Day level %")
               value: Math.max(0, root.dayVolume)
               from: 0
               to: 100
@@ -2225,10 +2225,10 @@ Panel {
 
             Text {
               width: parent.width
-              text: "Only the sun and fixed hours move the volume, and only when they turn "
+              text: tr.t("volume.note", "Only the sun and fixed hours move the volume, and only when they turn "
                 + "the day over — not when you pin a half yourself. Night never raises it "
                 + "and day never lowers it, so a machine you deliberately hushed stays "
-                + "hushed. Reach for the volume mid-fade and the fade gives way."
+                + "hushed. Reach for the volume mid-fade and the fade gives way.")
               color: root.dim
               font.family: root.face
               font.pixelSize: Style.font.caption
@@ -2238,7 +2238,7 @@ Panel {
 
           Text {
             width: parent.width
-            text: "A theme picked anywhere else lands in the half of the day that is running."
+            text: tr.t("footer.adopt", "A theme picked anywhere else lands in the half of the day that is running.")
             color: root.dim
             font.family: root.face
             font.pixelSize: Style.font.caption

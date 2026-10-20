@@ -5,6 +5,16 @@ Notable changes to Before Sunset.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-10-20
+
+### Added
+
+- **The panel and the notifications speak Polish.** They follow the language
+  picked under Setup > Language and change with it live, through the
+  translations Omarchy 4.5 offers plugins. English stays the default, and a
+  string a catalog leaves out falls back to it. On Omarchy before 4.5 there is
+  nothing to translate through, so everything stays in English as before.
+
 ## [0.7.6] - 2026-10-20
 
 ### Fixed

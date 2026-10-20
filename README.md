@@ -1,6 +1,6 @@
 # Before Sunset
 
-**Version 0.7.6** · [what changed](CHANGELOG.md)
+**Version 0.8.0** · [what changed](CHANGELOG.md)
 
 Follow the sun: one Omarchy theme through the day, another through the night,
 each with its own wallpaper and its own answer to whether the top bar should be
@@ -554,6 +554,16 @@ with themes that bring wallpapers in formats nothing on the system can read,
 and on installs upgraded from an older Omarchy where that package never
 arrived.
 
+## Language
+
+The panel and the notifications follow the language picked under Setup >
+Language (`omarchy language pl`), and switch with it without a restart. English
+and Polish ship in `i18n/`; another language is one more file next to them, and
+anything it leaves out falls back to English.
+
+This needs Omarchy 4.5, which is where plugins got translations. On an older
+Omarchy everything stays in English.
+
 ## Configuration
 
 The panel writes these; hand-editing works too. Settings live in this plugin's
@@ -661,6 +671,8 @@ Service.qml            the schedule, adoption, and remembered state
 BeforeSunsetPanel.qml     bar icon and settings panel
 Sun.js                 sunrise/sunset and the moon's phase, pure functions
 Sky.js                 the sun and the moon drawn in braille, pure functions
+Strings.qml            the panel's and the notifications' strings, via Omarchy 4.5's Translations
+i18n/                  one catalog per language: en.json, pl.json
 bin/before-sunset-apply   switch a theme, restoring its remembered background
 bin/before-sunset-pick    open the theme picker with a given theme preselected
 bin/before-sunset-themes  list installed themes and which side each reads as
