@@ -1,6 +1,6 @@
 # Before Sunset
 
-**Version 0.7.5** · [what changed](CHANGELOG.md)
+**Version 0.7.6** · [what changed](CHANGELOG.md)
 
 Follow the sun: one Omarchy theme through the day, another through the night,
 each with its own wallpaper and its own answer to whether the top bar should be
@@ -175,7 +175,7 @@ jq '(.bar.layout |= map_values(map(select(.id != "priard.before-sunset"))))
   mv /tmp/shell.json ~/.config/omarchy/shell.json
 ```
 
-One thing genuinely stays changed: the bar's `transparent` flag is left wherever
+One thing genuinely stays changed: the bar's background (`transparent` before Omarchy 4.5) is left wherever
 the schedule last set it, because it is a bar setting rather than a plugin one.
 Set it back from the bar settings if the last theme's preference was not yours.
 Your themes and wallpapers stay as they are — the plugin only ever drove
@@ -702,7 +702,7 @@ It reads `/sys/bus/iio/devices/` for a light sensor, sets the output volume and
 the screen colour temperature when you ask it to, and writes to exactly two
 places: its own entry in `~/.config/omarchy/shell.json`, and
 `~/.local/state/omarchy/settings/before-sunset.json`. It changes the bar's
-`transparent` flag when a theme's remembered preference or an undecodable
+background (`transparent` before Omarchy 4.5) when a theme's remembered preference or an undecodable
 wallpaper calls for it.
 
 ## Development

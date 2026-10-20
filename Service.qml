@@ -1343,8 +1343,13 @@ Item {
   // possibly an override this plugin wrote before the last restart.
   property bool barBaselineKnown: false
 
+  // Omarchy 4.5 keeps bar.background (none | glassy | opaque); a shell.json from
+  // before it says transparent instead. Same precedence as omarchy-bar.
   readonly property bool barTransparent: shellConfig && shellConfig.bar
-    ? shellConfig.bar.transparent === true : false
+    ? (shellConfig.bar.background !== undefined
+        ? shellConfig.bar.background === "none"
+        : shellConfig.bar.transparent === true)
+    : false
 
   // barTransparent has to read false until the config arrives, and false is
   // also a real value the bar can hold. Until this turns true there is no
@@ -1399,7 +1404,12 @@ Item {
     var mutated = typeof shell.mutateShellConfig === "function"
       ? shell.mutateShellConfig(function(config) {
           if (!config.bar) config.bar = ({})
-          config.bar.transparent = want
+          // Write the key this shell reads: a shell from before 4.5 never looks
+          // at background, and 4.5 lets background win over transparent.
+          if (config.bar.background !== undefined)
+            config.bar.background = want ? "none" : "opaque"
+          else
+            config.bar.transparent = want
         })
       : false
 
