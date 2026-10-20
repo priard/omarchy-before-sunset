@@ -90,7 +90,7 @@ Panel {
       var device = sensorDevices[i]
       options.push({
         value: String(device.path),
-        label: String(device.name) + " (" + String(device.id) + ") — " + device.value
+        label: plain(String(device.name) + " (" + String(device.id) + ") — " + device.value)
       })
     }
     return options
@@ -333,6 +333,12 @@ Panel {
 
   function clockOf(instant) {
     return instant ? Qt.formatDateTime(new Date(instant), "HH:mm") : ""
+  }
+
+  // The shell draws Dropdown labels as AutoText, and a device names itself, so
+  // anything that could read as markup is dropped before it gets there.
+  function plain(value) {
+    return String(value || "").replace(/[<>&\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "").substring(0, 120)
   }
 
   function canonical(name) {
@@ -777,6 +783,7 @@ Panel {
       height: midnightLabel.height
 
       Text {
+        textFormat: Text.PlainText
         id: midnightLabel
         anchors.left: parent.left
         text: "00:00"
@@ -786,6 +793,7 @@ Panel {
       }
 
       Text {
+        textFormat: Text.PlainText
         anchors.horizontalCenter: parent.horizontalCenter
         text: "12:00"
         color: root.dim
@@ -794,6 +802,7 @@ Panel {
       }
 
       Text {
+        textFormat: Text.PlainText
         anchors.right: parent.right
         text: "24:00"
         color: root.dim
@@ -897,6 +906,7 @@ Panel {
       height: startLabel.height
 
       Text {
+        textFormat: Text.PlainText
         id: startLabel
         anchors.left: parent.left
         text: root.sunGlyph + "  " + root.clockOf(timeline.dayStart)
@@ -906,6 +916,7 @@ Panel {
       }
 
       Text {
+        textFormat: Text.PlainText
         anchors.right: parent.right
         text: root.clockOf(timeline.dayEnd) + "  " + root.moonGlyph
         color: root.dim
@@ -948,6 +959,7 @@ Panel {
       }
 
       Text {
+        textFormat: Text.PlainText
         anchors.centerIn: parent
         width: parent.width - Style.space(12)
         visible: thumb.source === ""
@@ -972,6 +984,7 @@ Panel {
     }
 
     Text {
+      textFormat: Text.PlainText
       width: thumb.width
       text: thumb.caption
       color: root.dim
@@ -1074,6 +1087,7 @@ Panel {
         spacing: Style.space(6)
 
         Text {
+          textFormat: Text.PlainText
           text: card.label
           color: root.dim
           font.family: root.face
@@ -1082,6 +1096,7 @@ Panel {
         }
 
         Text {
+          textFormat: Text.PlainText
           visible: card.mode !== ""
           text: "(" + tr.t("themeMode." + card.mode, card.mode) + ")"
           color: root.dim
@@ -1090,6 +1105,7 @@ Panel {
         }
 
         Text {
+          textFormat: Text.PlainText
           visible: card.inForce
           text: tr.t("slot.now", "· now")
           color: root.dim
@@ -1099,6 +1115,7 @@ Panel {
       }
 
       Text {
+        textFormat: Text.PlainText
         id: barLabel
         anchors.right: barSwitch.left
         anchors.rightMargin: Style.space(8)
@@ -1175,6 +1192,7 @@ Panel {
         spacing: Style.space(8)
 
         Text {
+          textFormat: Text.PlainText
           id: titleText
           text: disclosure.title
           color: root.dim
@@ -1184,6 +1202,7 @@ Panel {
         }
 
         Text {
+          textFormat: Text.PlainText
           visible: !disclosure.expanded && disclosure.summary !== ""
           text: disclosure.summary
           color: root.dim
@@ -1194,6 +1213,7 @@ Panel {
       }
 
       Text {
+        textFormat: Text.PlainText
         id: chevron
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
@@ -1263,6 +1283,7 @@ Panel {
             foreground: root.fg
             fontFamily: root.face
             iconComponent: Text {
+              textFormat: Text.PlainText
               text: root.skyLines.join("\n")
               color: root.fg
               font.family: root.face
@@ -1304,6 +1325,7 @@ Panel {
               }
 
               Text {
+                textFormat: Text.PlainText
                 text: root.nightlightHeld ? tr.t("status.nightlightHeld", "%1 K held").arg(root.nightlightActual)
                   : (root.nightlightActual > 0 ? tr.t("status.kelvin", "%1 K").arg(root.nightlightActual) : tr.t("status.nightlight", "night light"))
                 color: root.dim
@@ -1317,6 +1339,7 @@ Panel {
               spacing: Style.space(6)
 
               Text {
+                textFormat: Text.PlainText
                 // nf-md-brightness_6, and above the basic plane like the speaker
                 // below it, so it is written as a code point rather than an
                 // escape that would only cover half of it.
@@ -1327,6 +1350,7 @@ Panel {
               }
 
               Text {
+                textFormat: Text.PlainText
                 text: root.brightnessNote
                 color: root.dim
                 font.family: root.face
@@ -1339,6 +1363,7 @@ Panel {
               spacing: Style.space(6)
 
               Text {
+                textFormat: Text.PlainText
                 // Above the basic plane, so a four-digit \u escape would take
                 // only half of it and print the remainder as a digit.
                 text: String.fromCodePoint(0xf0580)
@@ -1348,6 +1373,7 @@ Panel {
               }
 
               Text {
+                textFormat: Text.PlainText
                 text: root.volumeNote
                 color: root.dim
                 font.family: root.face
@@ -1384,6 +1410,7 @@ Panel {
             }
 
             Text {
+              textFormat: Text.PlainText
               visible: root.configMode === "day" || root.configMode === "night"
               width: parent.width
               text: tr.t("mode.pinnedNote", "Pinned. The theme is not following the schedule; switch to Auto to "
@@ -1409,6 +1436,7 @@ Panel {
             SlotCard { label: tr.t("slot.night", "NIGHT"); slot: "nightTheme"; slug: root.nightTheme }
 
             Text {
+              textFormat: Text.PlainText
               visible: !root.wallpaperRenderable
               width: parent.width
               text: tr.t("slot.undecodable", "This wallpaper is in a format Qt cannot decode here, so the desktop "
@@ -1438,6 +1466,7 @@ Panel {
             summary: root.scheduleSummary
 
             Text {
+              textFormat: Text.PlainText
               visible: root.configMode === "day" || root.configMode === "night"
               width: parent.width
               text: tr.t("schedule.pinnedNote", "Pinned, so the schedule is not running: nothing here moves the "
@@ -1460,6 +1489,7 @@ Panel {
             }
 
             Text {
+              textFormat: Text.PlainText
               visible: !root.hasLocation
               width: parent.width
               text: tr.t("schedule.needsLocation", "Sunrise and sunset need a location. Set one in the Weather widget, "
@@ -1484,6 +1514,7 @@ Panel {
               }
 
               Text {
+                textFormat: Text.PlainText
                 width: parent.width
                 text: root.locationName
                 color: root.dim
@@ -1549,6 +1580,7 @@ Panel {
                 spacing: Style.space(6)
 
                 Text {
+                  textFormat: Text.PlainText
                   text: tr.t("schedule.dayFrom", "Day from")
                   color: root.dim
                   font.family: root.face
@@ -1571,6 +1603,7 @@ Panel {
                 spacing: Style.space(6)
 
                 Text {
+                  textFormat: Text.PlainText
                   text: tr.t("schedule.nightFrom", "Night from")
                   color: root.dim
                   font.family: root.face
@@ -1607,6 +1640,7 @@ Panel {
               }
 
               Text {
+                textFormat: Text.PlainText
                 visible: root.sensorDevices.length > 1
                 width: parent.width
                 text: tr.t("sensor.switchNote", "Sensors read differently from one another, so check the threshold "
@@ -1622,6 +1656,7 @@ Panel {
                 height: Math.max(readingLabel.height, calibrate.height)
 
                 Text {
+                  textFormat: Text.PlainText
                   id: readingLabel
                   anchors.left: parent.left
                   anchors.verticalCenter: parent.verticalCenter
@@ -1676,6 +1711,7 @@ Panel {
               }
 
               Text {
+                textFormat: Text.PlainText
                 width: parent.width
                 text: root.sensorExplanation
                 color: root.dim
@@ -1708,6 +1744,7 @@ Panel {
             }
 
             Text {
+              textFormat: Text.PlainText
               width: parent.width
               text: {
                 var now = root.nightlightActual > 0 ? tr.t("nightlight.now", "Screen is at %1 K.").arg(root.nightlightActual) + " " : ""
@@ -1747,6 +1784,7 @@ Panel {
                 spacing: Style.space(6)
 
                 Text {
+                  textFormat: Text.PlainText
                   text: tr.t("nightlight.neutralFrom", "Neutral from")
                   color: root.dim
                   font.family: root.face
@@ -1767,6 +1805,7 @@ Panel {
                 spacing: Style.space(6)
 
                 Text {
+                  textFormat: Text.PlainText
                   text: tr.t("nightlight.warmFrom", "Warm from")
                   color: root.dim
                   font.family: root.face
@@ -1849,6 +1888,7 @@ Panel {
             }
 
             Text {
+              textFormat: Text.PlainText
               visible: root.nightlightEnabled
               width: parent.width
               text: tr.t("nightlight.guide", "%1 K is %2. 6500 K is neutral, 5000 barely shows, 4000 is comfortable for an evening, below 3000 most people find too much. The change is spread over the whole window, so no single minute of it is visible.").arg(root.nightlightNight).arg(root.nightlightStrength)
@@ -1859,6 +1899,7 @@ Panel {
             }
 
             Text {
+              textFormat: Text.PlainText
               width: parent.width
               text: tr.t("nightlight.sharedNote", "Shares the night light with Omarchy's own toggle: switching it on there "
                 + "hands the schedule the wheel, switching it off takes it back.")
@@ -1884,6 +1925,7 @@ Panel {
             visible: root.brightnessAvailable
 
             Text {
+              textFormat: Text.PlainText
               visible: root.timetableNote !== ""
               width: parent.width
               text: root.timetableNote
@@ -1898,6 +1940,7 @@ Panel {
               height: Math.max(dimLabel.height, dimSwitch.height)
 
               Text {
+                textFormat: Text.PlainText
                 id: dimLabel
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
@@ -1950,6 +1993,7 @@ Panel {
               height: Math.max(liftLabel.height, liftSwitch.height)
 
               Text {
+                textFormat: Text.PlainText
                 id: liftLabel
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
@@ -2018,6 +2062,7 @@ Panel {
                       anchors.verticalCenter: parent.verticalCenter
 
                       Text {
+                        textFormat: Text.PlainText
                         width: parent.width
                         text: String(displayRow.modelData.label || tr.t("brightness.display", "Display"))
                         color: root.fg
@@ -2027,6 +2072,7 @@ Panel {
                       }
 
                       Text {
+                        textFormat: Text.PlainText
                         width: parent.width
                         // The live reading is what tells two identical displays
                         // apart. Apple's have no connector to name them by, so
@@ -2094,6 +2140,7 @@ Panel {
             }
 
             Text {
+              textFormat: Text.PlainText
               width: parent.width
               text: tr.t("brightness.note", "Only the sun and fixed hours move the brightness, and only when they "
                 + "turn the day over. Night never raises it and day never lowers it, so a "
@@ -2105,6 +2152,7 @@ Panel {
             }
 
             Text {
+              textFormat: Text.PlainText
               width: parent.width
               text: tr.t("brightness.undrivenNote", "Displays that cannot be driven are not listed. A monitor with no DDC, "
                 + "or one whose firmware refuses, is left alone rather than reported broken.")
@@ -2126,6 +2174,7 @@ Panel {
 
 
             Text {
+              textFormat: Text.PlainText
               visible: root.timetableNote !== ""
               width: parent.width
               text: root.timetableNote
@@ -2140,6 +2189,7 @@ Panel {
               height: Math.max(nightLabel.height, nightSwitch.height)
 
               Text {
+                textFormat: Text.PlainText
                 id: nightLabel
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
@@ -2192,6 +2242,7 @@ Panel {
               height: Math.max(dayLabel.height, daySwitch.height)
 
               Text {
+                textFormat: Text.PlainText
                 id: dayLabel
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
@@ -2224,6 +2275,7 @@ Panel {
             }
 
             Text {
+              textFormat: Text.PlainText
               width: parent.width
               text: tr.t("volume.note", "Only the sun and fixed hours move the volume, and only when they turn "
                 + "the day over — not when you pin a half yourself. Night never raises it "
@@ -2237,6 +2289,7 @@ Panel {
           }
 
           Text {
+            textFormat: Text.PlainText
             width: parent.width
             text: tr.t("footer.adopt", "A theme picked anywhere else lands in the half of the day that is running.")
             color: root.dim

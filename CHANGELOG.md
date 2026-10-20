@@ -5,6 +5,23 @@ Notable changes to Before Sunset.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-10-20
+
+### Security
+
+- **Text from outside the plugin is no longer read as markup.** Every `Text`
+  in the panel sat on Qt's AutoText, which renders anything that looks like
+  HTML as rich text, and rich text loads `<img>` sources. The location name
+  comes from the Weather widget and can come from a geocoding response, so
+  picking such a location could make opening the panel fetch an image of
+  someone else's choosing inside the shared shell. Reported in the marketplace
+  review of 0.8.0. Every `Text` is now `PlainText`, literal or not.
+- **The same goes for what the shell draws itself.** Sensor names in the
+  sensor dropdown, and the title and body of a notification, drop `<`, `>`,
+  `&` and control characters and are capped. A notification also drops a
+  leading dash, because `omarchy-notification-send` has no `--` and would
+  otherwise read a theme named like one of its options as that option.
+
 ## [0.8.0] - 2026-10-20
 
 ### Added
