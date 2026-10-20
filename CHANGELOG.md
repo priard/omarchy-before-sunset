@@ -5,6 +5,22 @@ Notable changes to Before Sunset.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.6] - 2026-10-20
+
+### Fixed
+
+- **The plugin no longer spins the shell on Omarchy 4.5.** Omarchy 4.5 replaced
+  `bar.transparent` with `bar.background` (`none`, `glassy` or `opaque`), and
+  `omarchy-bar` drops the old key on every write. The plugin kept reading
+  `transparent`, always saw an opaque bar, asked for a transparent one, and the
+  reload that followed put it straight back where it started. `shell.json` was
+  rewritten a few times a second and theme switches crawled.
+
+  The bar now counts as transparent when `background` is `none`, falling back
+  to `transparent` when there is no `background` — the same order `omarchy-bar`
+  uses. Writes go to whichever key the shell already keeps, so one build works
+  on 4.5 and on the versions before it.
+
 ## [0.7.5] - 2026-09-09
 
 ### Fixed
