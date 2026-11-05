@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Print a line every time this machine comes back from suspend.
+# Report every time this machine comes back from suspend.
 #
 # Long-running by design: the caller keeps the process open and reads one line
 # per resume. logind announces the return on the system bus, and it announces
@@ -13,7 +13,12 @@
 # desktop; `busctl monitor` and `dbus-monitor` would both want the
 # eavesdropping rights the system bus reserves for root.
 #
-# Output: the line "wake", once per resume. Nothing else is printed.
+# Output: gdbus's own lines, one per signal; the caller keeps the ones that
+# carry PrepareForSleep with false, which is the way back up.
+#
+# exec, not a pipe: the shell stops this by signalling the one process it
+# started. A pipeline would lose only its bash, and the gdbus behind it, which
+# writes nothing until the next suspend, would outlive every shell reload.
 
 set -uo pipefail
 
@@ -23,13 +28,6 @@ command -v gdbus >/dev/null || exit 127
 # is a pipe: a resume would sit in a 4 KB buffer until enough further resumes
 # pushed it out, which on a laptop is days. Line buffering is what makes this
 # timely at all.
-stdbuf -oL gdbus monitor --system \
+exec stdbuf -oL gdbus monitor --system \
   --dest org.freedesktop.login1 \
-  --object-path /org/freedesktop/login1 2>/dev/null |
-  while IFS= read -r line; do
-    # PrepareForSleep carries true on the way down and false on the way back
-    # up. Only the way back up is news.
-    [[ $line == *PrepareForSleep* ]] || continue
-    [[ $line == *false* ]] || continue
-    echo wake
-  done
+  --object-path /org/freedesktop/login1 2>/dev/null

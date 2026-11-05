@@ -62,7 +62,25 @@ Item {
 
   // This plugin's own entry in shell.json. Re-evaluates whenever the shell
   // reloads its config, so edits take effect without restarting anything.
-  readonly property var settings: shellConfig ? findSettings(shellConfig) : ({})
+  readonly property var fromShell: shellConfig ? findSettings(shellConfig) : ({})
+
+  // Omarchy 4.5 refreshes `barConfig` before its own config has caught up, so
+  // a plugin is handed the entry as it stood one write ago. Pressing Auto
+  // stored auto and left the service still pinned, and the next write built
+  // on that stale entry put the old values back. So the entry this plugin
+  // last wrote stands until the shell hands the same entry back.
+  property var written: null
+  readonly property var settings: written || fromShell
+  onFromShellChanged: if (written && canonicalJson(fromShell) === canonicalJson(written)) written = null
+
+  function canonicalJson(value) {
+    if (Array.isArray(value)) return "[" + value.map(canonicalJson).join(",") + "]"
+    if (value && typeof value === "object")
+      return "{" + Object.keys(value).sort().map(function(key) {
+        return JSON.stringify(key) + ":" + canonicalJson(value[key])
+      }).join(",") + "}"
+    return JSON.stringify(value === undefined ? null : value)
+  }
 
   // Precedence deliberately matches shell.updateEntryInline, which is what both
   // the panel and this service write through: it targets the bar layout entry
@@ -1146,6 +1164,7 @@ Item {
     for (var key in base) if (key !== "id") entry[key] = base[key]
     for (var change in changes) entry[change] = changes[change]
 
+    written = entry
     shell.updateEntryInline(pluginId, entry)
   }
 
@@ -1681,7 +1700,8 @@ Item {
     command: [root.pluginFile("bin/before-sunset-wake")]
     running: true
     stdout: SplitParser {
-      onRead: root.wake()
+      // PrepareForSleep carries true on the way down and false on the way back up.
+      onRead: data => { if (data.indexOf("PrepareForSleep") >= 0 && data.indexOf("false") >= 0) root.wake() }
     }
     // The watcher is a shortcut, not the mechanism: the minute tick still
     // corrects everything, just late. So a machine with no gdbus, or a bus
