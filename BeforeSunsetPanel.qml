@@ -465,6 +465,12 @@ Panel {
   }
 
   function persist(changes) {
+    // The service holds the entry it last wrote until the shell catches up,
+    // so writing through it keeps two quick clicks from undoing each other.
+    if (service && typeof service.persist === "function") {
+      service.persist(changes)
+      return
+    }
     if (!bar || !bar.shell || typeof bar.shell.updateEntryInline !== "function") {
       console.warn("before-sunset: no shell to persist through")
       return

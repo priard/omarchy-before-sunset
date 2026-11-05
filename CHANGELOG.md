@@ -5,6 +5,21 @@ Notable changes to Before Sunset.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-11-05
+
+### Fixed
+
+- **Auto works again on Omarchy 4.5.** The 4.5 shell hands a plugin its
+  settings as they stood one write ago, so pressing Auto stored auto while the
+  service stayed pinned, and the next change, built on that stale entry, put
+  the previous values back (which is how settings such as the night light went
+  missing). The service now holds the entry it last wrote until the shell hands
+  the same one back, and the panel writes through the service.
+- **The suspend watcher no longer outlives the shell.** It ran as a pipeline,
+  and stopping the plugin stopped only its `bash`: the `gdbus` behind it, which
+  prints nothing until the next suspend, kept running after every shell restart
+  and plugin reload. It is now a single process that goes when it is stopped.
+
 ## [0.8.1] - 2026-10-20
 
 ### Security
