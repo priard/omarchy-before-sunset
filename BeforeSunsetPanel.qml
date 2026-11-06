@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Window
 import Quickshell.Io
 import qs.Ui
 import qs.Commons
@@ -308,12 +309,10 @@ Panel {
   property real nowMs: 0
 
   // Weather Icons' clear-day and clear-night, the same pair the Omarchy weather
-  // widget already renders, so the bar font is known to cover them. Written as
-  // escapes rather than literal glyphs: private-use characters do not survive
-  // every editor and transport, and one that gets eaten leaves a blank button
-  // with nothing to indicate what went wrong.
-  // The bar keeps a single glyph, because a bar cell is one character wide. The
-  // panel has room for the twelve-dot version.
+  // widget already renders, so the font is known to cover them. They label the
+  // ends of the timeline. Written as escapes rather than literal glyphs:
+  // private-use characters do not survive every editor and transport, and one
+  // that gets eaten leaves a blank with nothing to indicate what went wrong.
   property real rayPhase: 0
 
   readonly property real moonIllumination: Sun.moonIllumination(new Date(root.nowMs))
@@ -325,7 +324,10 @@ Panel {
 
   readonly property string sunGlyph: "\ue30d"
   readonly property string moonGlyph: "\ue32b"
-  readonly property string barIcon: side === "day" ? sunGlyph : moonGlyph
+
+  // The bar draws its own sun and moon as pixel art rather than borrowing a
+  // font glyph that every other widget could be wearing.
+  readonly property var barPixels: side === "day" ? Sky.PIXEL_SUN : Sky.PIXEL_MOON
 
   readonly property color fg: bar ? bar.foreground : Color.foreground
   readonly property color dim: Qt.darker(fg, 1.4)
@@ -689,7 +691,35 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: root.barIcon
+    iconComponent: Rectangle {
+      id: sprite
+      // A plain box, so the shell measures it as exactly the icon size and
+      // draws it unscaled. Each square is a whole number of screen pixels,
+      // otherwise neighbouring squares come out one pixel and two pixels wide.
+      // The window's ratio, not the screen's: under fractional scaling the
+      // screen reports 2 where the bar is really drawn at 1.5.
+      readonly property real ratio: Window.window && Window.window.devicePixelRatio > 0 ? Window.window.devicePixelRatio : 1
+      readonly property real cell: Math.max(1, Math.floor(Style.bar.iconSize * ratio / Sky.PIXELS)) / ratio
+      readonly property real inset: Math.round((Style.bar.iconSize - cell * Sky.PIXELS) / 2 * ratio) / ratio
+      width: Style.bar.iconSize
+      height: Style.bar.iconSize
+      color: "transparent"
+
+      Repeater {
+        model: Sky.PIXELS * Sky.PIXELS
+        Rectangle {
+          readonly property int col: index % Sky.PIXELS
+          readonly property int row: Math.floor(index / Sky.PIXELS)
+          visible: root.barPixels[row].charAt(col) === "#"
+          x: sprite.inset + col * sprite.cell
+          y: sprite.inset + row * sprite.cell
+          width: sprite.cell
+          height: sprite.cell
+          antialiasing: false
+          color: button.active && button.useActiveColor ? button.activeColor : button.foreground
+        }
+      }
+    }
     tooltipText: root.heroMeta
     onPressed: function(which) {
       // Right-click pins the other half, or hands control back to the schedule,

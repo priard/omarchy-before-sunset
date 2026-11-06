@@ -5,6 +5,17 @@ Notable changes to Before Sunset.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-11-06
+
+### Changed
+
+- **The bar icon is the plugin's own.** It was a sun and moon from the Weather
+  Icons font, the same glyphs the weather widget wears. It is now pixel art in
+  the spirit of the panel's braille sky: a sun by day and a crescent moon by
+  night, nine squares across and fixed, so it reads at a glance. Each square
+  is a whole number of screen pixels, two by two at the common 1.5 scale, so
+  it stays sharp under fractional scaling.
+
 ## [0.8.2] - 2026-11-05
 
 ### Fixed
