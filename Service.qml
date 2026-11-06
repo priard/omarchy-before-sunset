@@ -90,7 +90,9 @@ Item {
   function findSettings(config) {
     var layout = config && config.bar ? config.bar.layout : null
     if (layout) {
-      var regions = ["left", "center", "right"]
+      // The same sections, in the same order, as the shell's Util.barSections:
+      // a widget moved beside the clock lives in centerBegin or centerEnd.
+      var regions = ["left", "centerBegin", "center", "centerEnd", "right", "tray"]
       for (var i = 0; i < regions.length; i++) {
         var inBar = findInList(layout[regions[i]])
         if (inBar) return inBar

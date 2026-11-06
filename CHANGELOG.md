@@ -5,6 +5,16 @@ Notable changes to Before Sunset.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-11-06
+
+### Fixed
+
+- **The widget keeps its settings beside the clock.** The plugin looked for its
+  own entry only in the `left`, `center` and `right` sections of the bar, so
+  moved into `centerBegin` or `centerEnd` it found nothing, read as
+  unconfigured and stopped switching. It now looks in every section the shell
+  writes to, in the shell's own order. Reported in #8.
+
 ## [0.9.0] - 2026-11-06
 
 ### Changed
