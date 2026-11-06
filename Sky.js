@@ -78,3 +78,37 @@ function moon(illumination, waxing) {
     return dx >= edge * Math.sqrt(Math.max(0, 1 - (dy / MOON) * (dy / MOON)))
   })
 }
+
+// The bar's icon: a sun and a crescent moon as pixel art, nine squares across.
+// Nine because the bar draws icons twelve points tall, and at the common 1.5
+// scale that is eighteen screen pixels, two to a square. Both are drawn, not
+// computed, and fixed: an icon this small has to read as a sun and a moon at a
+// glance, and a moon that followed its phase would spend a week of every month
+// as a ring or a sliver.
+//
+// Each is nine strings of nine characters, "#" for a lit square.
+var PIXELS = 9
+
+var PIXEL_SUN = [
+  "....#....",
+  ".#.....#.",
+  "...###...",
+  "..#####..",
+  "#.#####.#",
+  "..#####..",
+  "...###...",
+  ".#.....#.",
+  "....#...."
+]
+
+var PIXEL_MOON = [
+  "...##....",
+  ".###.....",
+  ".##......",
+  "###......",
+  "###......",
+  "####.....",
+  ".####....",
+  ".#######.",
+  "...###..."
+]

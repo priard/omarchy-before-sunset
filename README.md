@@ -1,6 +1,6 @@
 # Before Sunset
 
-**Version 0.8.2** · [what changed](CHANGELOG.md)
+**Version 0.9.0** · [what changed](CHANGELOG.md)
 
 Follow the sun: one Omarchy theme through the day, another through the night,
 each with its own wallpaper and its own answer to whether the top bar should be
@@ -184,8 +184,10 @@ were using.
 
 ## The panel
 
-Click the bar icon. Right-click pins the other half without opening anything,
-and pins back to Auto from there.
+Click the bar icon, a pixel-art sun by day and a crescent moon by night, drawn
+by the plugin rather than taken from a font so it does not look like every other
+widget. Right-click pins the other half without opening anything, and pins back
+to Auto from there.
 
 **MODE** — `Day` and `Night` pin one slot and stop the schedule. `Auto`
 follows it.
@@ -670,7 +672,7 @@ manifest.json          plugin metadata
 Service.qml            the schedule, adoption, and remembered state
 BeforeSunsetPanel.qml     bar icon and settings panel
 Sun.js                 sunrise/sunset and the moon's phase, pure functions
-Sky.js                 the sun and the moon drawn in braille, pure functions
+Sky.js                 the sun and the moon in braille and as bar pixel art
 Strings.qml            the panel's and the notifications' strings, via Omarchy 4.5's Translations
 i18n/                  one catalog per language: en.json, pl.json
 bin/before-sunset-apply   switch a theme, restoring its remembered background
