@@ -1066,7 +1066,7 @@ Item {
       if (sun) return sun
     }
 
-    return configAutoMode === "fixed" ? Sun.fixedSchedule(when, fixedDay, fixedNight) : null
+    return Sun.fixedSchedule(when, fixedDay, fixedNight)
   }
 
   function computeAutoSchedule() {
@@ -1090,14 +1090,11 @@ Item {
         autoSource = "sun"
         return sun
       }
-      // No solar transition is available (for example, a polar season).
-      // Hold the current theme rather than inventing fixed clock boundaries.
+      // Inside the polar circles there are stretches with no sunrise or sunset
+      // at all. Fall through to the clock so the desktop keeps some rhythm
+      // instead of freezing on one theme for weeks.
     }
 
-    if (configAutoMode !== "fixed") {
-      autoSource = ""
-      return null
-    }
     var fixed = Sun.fixedSchedule(now, fixedDay, fixedNight)
     autoSource = fixed ? "fixed" : ""
     return fixed

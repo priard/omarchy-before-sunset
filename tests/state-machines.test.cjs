@@ -33,13 +33,17 @@ s=m.transition(s,'success'); assert.equal(s.phase,'waiting');
 for(const pair of [[null,0],['40',0],[NaN,0],[91,0],[0,181],[Infinity,0]]) assert(!m.coordinates(...pair));
 assert(m.coordinates(0,0)); assert(m.coordinates(-90,180));
 const src=fs.readFileSync(path.join(dir,'Service.qml'),'utf8');
-const compute=src.slice(src.indexOf('  function computeAutoSchedule()'),src.indexOf('  // What the theme follows,'));
-let c=vm.createContext({Date,configAutoMode:'sun',hasLocation:false,autoSource:'',sensorUsable:false,Sun:{fixedSchedule(){throw Error('unrequested fixed fallback')},sunSchedule(){return null}},latitude:40,longitude:-74,twilight:'official',sunriseOffsetMinutes:0,sunsetOffsetMinutes:0});
+const compute=src.slice(src.indexOf('  function scheduleAt(instant)'),src.indexOf('  // What the theme follows,'));
+let c=vm.createContext({Date,configAutoMode:'sun',hasLocation:false,autoSource:'',sensorUsable:false,fixedDay:'07:00',fixedNight:'19:00',Sun:{fixedSchedule(){return {mode:'night'}},sunSchedule(){return null}},latitude:40,longitude:-74,twilight:'official',sunriseOffsetMinutes:0,sunsetOffsetMinutes:0});
 vm.runInContext(compute,c);
-assert.equal(c.computeAutoSchedule(),null); assert.equal(c.autoSource,'');
-c.hasLocation=true; assert.equal(c.computeAutoSchedule(),null); // polar/no-event day holds theme
+assert.equal(c.computeAutoSchedule().mode,'night'); assert.equal(c.autoSource,'fixed');
+assert.equal(c.scheduleAt(Date.now()).mode,'night');
+c.hasLocation=true; assert.equal(c.computeAutoSchedule().mode,'night'); // polar/no-event day uses fixed hours
+assert.equal(c.autoSource,'fixed'); assert.equal(c.scheduleAt(Date.now()).mode,'night');
 c.Sun.sunSchedule=()=>({mode:'day'}); assert.equal(c.computeAutoSchedule().mode,'day');
-assert.equal(c.autoSource,'sun');
+assert.equal(c.autoSource,'sun'); assert.equal(c.scheduleAt(Date.now()).mode,'day');
+c.configAutoMode='sensor'; assert.equal(c.computeAutoSchedule().mode,'day');
+c.hasLocation=false; assert.equal(c.computeAutoSchedule().mode,'night'); assert.equal(c.autoSource,'fixed');
 c.configAutoMode='fixed'; c.fixedDay='07:00'; c.fixedNight='19:00'; c.Sun.fixedSchedule=()=>({mode:'night'});
 assert.equal(c.computeAutoSchedule().mode,'night');
 const start=src.indexOf('onExited: function(exitCode)',src.indexOf('id: themeProcess'));

@@ -280,7 +280,7 @@ The first reading of a session commits immediately; there is nothing to flap
 away from yet, and waiting would leave the desktop undecided for no reason.
 
 If sensor mode is selected but no threshold has been set, or the sensor
-disappears, the schedule falls back to the sun when location is available rather than
+disappears, the schedule falls back to the sun or fixed hours rather than
 freezing: an unconfigured preference should not take the desktop down with it.
 
 ![The light sensor, with a live reading and calibration](docs/schedule-sensor.png)
@@ -603,7 +603,7 @@ the same precedence the shell's own `updateEntryInline` uses.
 | `twilight` | `"official"` | Where the boundary sits: `official` (the visible horizon, i.e. sunrise and sunset), `civil` (~30 min later in the evening, earlier in the morning), `nautical`, `astronomical`, or a zenith angle in degrees. |
 | `sunriseOffsetMinutes` | `0` | Shifts the morning switch. Negative is earlier. |
 | `sunsetOffsetMinutes` | `0` | Shifts the evening switch. Negative is earlier. |
-| `fixed` | `{"day":"07:00","night":"19:00"}` | Clock times for `autoMode: "fixed"`. |
+| `fixed` | `{"day":"07:00","night":"19:00"}` | Clock times for `autoMode: "fixed"`, and the fallback during polar day or polar night. |
 | `latitude` / `longitude` | — | Override the shared weather location for this plugin only. |
 | `notify` | `false` | Send a desktop notification on each switch and each adoption. |
 | `sensor` | — | `{"threshold": 0, "hysteresis": 0.15, "dwellSeconds": 45, "device": ""}` for `autoMode: "sensor"`. A threshold of `0` means not calibrated yet; an empty `device` averages every sensor found. |
@@ -664,8 +664,9 @@ prompt. It is a shortcut rather than the mechanism: on a machine with no `gdbus`
 the tick still corrects everything, just later.
 
 Inside the polar circles there are stretches with no sunrise or sunset at all.
-Sun mode holds the current theme when no solar transition is available, or
-when location is unavailable. Select Fixed hours explicitly to use clock times.
+The schedule falls back to the `fixed` clock times so the desktop keeps some
+rhythm instead of freezing on one theme for weeks. Fixed hours also provide a
+fallback while location is unavailable.
 
 Light and dark readings come from `omarchy-theme-color`, the same helper the
 rest of Omarchy uses, so its precedence (`mode`, legacy `theme_type`, a
