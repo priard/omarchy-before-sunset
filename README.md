@@ -243,6 +243,16 @@ omarchy-weather-location --set "Warsaw" 52.22977,21.01178
 Changing it there changes the schedule here. Setting `latitude` and
 `longitude` in this plugin's own settings overrides it.
 
+When neither source supplies valid coordinates, the service detects an approximate
+location through `https://geo.omarchy.org/`. This sends the public IP address to
+that service. A valid response is cached in
+`~/.cache/omarchy/before-sunset-location.json` for use after lookup failures.
+Manual plugin coordinates and the shared weather location always take priority.
+
+Lookups run after startup, resume and NetworkManager events, with a ten-second
+coalescing delay. Failed lookups retry after 30 seconds, two minutes and ten
+minutes, then stop until another event. There is no periodic location polling.
+
 ## Light sensor
 
 Machines with an ambient light sensor expose it through the kernel's IIO
@@ -655,7 +665,8 @@ the tick still corrects everything, just later.
 
 Inside the polar circles there are stretches with no sunrise or sunset at all.
 The schedule falls back to the `fixed` clock times so the desktop keeps some
-rhythm instead of freezing on one theme for weeks.
+rhythm instead of freezing on one theme for weeks. Fixed hours also provide a
+fallback while location is unavailable.
 
 Light and dark readings come from `omarchy-theme-color`, the same helper the
 rest of Omarchy uses, so its precedence (`mode`, legacy `theme_type`, a
@@ -706,16 +717,16 @@ its base packages along with the `/etc/sudoers.d` rule that lets it run without 
 password. That rule is Omarchy's own file and grants exactly one command —
 `NOPASSWD: /usr/bin/asdcontrol` — which this plugin reads and never installs,
 edits or removes. Every call passes `-n`, so where the rule is absent the
-displays simply do not appear in the list and nothing prompts. It makes no network requests: sunrise and sunset
-are arithmetic, not an API call.
+displays simply do not appear in the list and nothing prompts. Sunrise and sunset are computed locally. Automatic location detection uses
+`curl` for the geo lookup and `nmcli monitor` for network change events.
 
 It listens on the system bus for logind's resume announcement, which is a
 broadcast signal: received with no privileges, and nothing is sent back.
 
 It reads `/sys/bus/iio/devices/` for a light sensor, sets the output volume and
-the screen colour temperature when you ask it to, and writes to exactly two
-places: its own entry in `~/.config/omarchy/shell.json`, and
-`~/.local/state/omarchy/settings/before-sunset.json`. It changes the bar's
+the screen colour temperature when you ask it to, and writes its settings to its own entry in `~/.config/omarchy/shell.json` and
+`~/.local/state/omarchy/settings/before-sunset.json`, and caches detected location
+in `~/.cache/omarchy/before-sunset-location.json`. It changes the bar's
 background (`transparent` before Omarchy 4.5) when a theme's remembered preference or an undecodable
 wallpaper calls for it.
 
@@ -729,6 +740,18 @@ Saving a file under `~/.config/omarchy/plugins/` logs a plugin reload, but a
 running service instance keeps its old code and its IPC target, and a mounted
 bar widget keeps its old code too. Run `omarchy restart shell` after editing
 the QML, before concluding anything about behaviour.
+
+Run the automated regression checks from the repository root:
+
+```bash
+node tests/state-machines.test.cjs
+python3 tests/location-cache.test.py
+bash -n bin/before-sunset-auto-location
+```
+
+The tests cover location state transitions and cache validation, solar boundaries,
+missing solar schedules and stale theme queues. They do not replace a live shell
+test of startup, suspend/resume and network changes.
 
 ## Changelog
 
