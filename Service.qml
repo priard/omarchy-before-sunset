@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "Sun.js" as Sun
+import "LocationState.js" as LocationState
 
 // Keeps the Omarchy theme in step with the sun: one theme for the day half,
 // another for the night half. Either slot may hold any theme — two light
@@ -893,19 +894,91 @@ Item {
   // ------------------------------------------------------------- location
 
   property var storedLocation: ({ name: "", latitude: null, longitude: null })
+  property var detectedLocation: ({ name: "", latitude: null, longitude: null })
+  readonly property var effectiveLocation: storedLocation.latitude !== null ? storedLocation : detectedLocation
 
   readonly property real configuredLatitude: numberSetting("latitude")
   readonly property real configuredLongitude: numberSetting("longitude")
-  readonly property bool hasConfiguredCoordinates: !isNaN(configuredLatitude) && !isNaN(configuredLongitude)
+  readonly property bool hasConfiguredCoordinates: LocationState.coordinates(configuredLatitude, configuredLongitude)
 
   readonly property real latitude: hasConfiguredCoordinates ? configuredLatitude
-    : (storedLocation && storedLocation.latitude !== null ? storedLocation.latitude : NaN)
+    : (effectiveLocation.latitude !== null ? effectiveLocation.latitude : NaN)
   readonly property real longitude: hasConfiguredCoordinates ? configuredLongitude
-    : (storedLocation && storedLocation.longitude !== null ? storedLocation.longitude : NaN)
+    : (effectiveLocation.longitude !== null ? effectiveLocation.longitude : NaN)
   readonly property bool hasLocation: !isNaN(latitude) && !isNaN(longitude)
   readonly property string locationName: hasConfiguredCoordinates
     ? String(setting("locationName", ""))
-    : String(storedLocation && storedLocation.name ? storedLocation.name : "")
+    : String(effectiveLocation.name || "")
+
+  readonly property bool autoLocationEnabled: !hasConfiguredCoordinates && storedLocation.latitude === null
+  property var locationState: LocationState.initial()
+  property var lookupResult: null
+  property int networkWatchFailures: 0
+
+  function locationEvent(event) {
+    locationState = LocationState.transition(locationState, event)
+    if (locationState.phase === "waiting") {
+      if (!locationRefresh.running) {
+        locationRefresh.interval = locationState.delay
+        locationRefresh.start()
+      }
+    } else locationRefresh.stop()
+  }
+  function finishLocationLookup() {
+    var result = lookupResult
+    var fresh = result && result.fresh === true
+    // Ignore a response from a network that changed during the lookup, or
+    // from an attempt superseded by a manually configured location.
+    if (locationState.enabled && !locationState.dirty && result && result.location) {
+      var parsed = parseLocation(JSON.stringify(result.location))
+      if (parsed.latitude !== null) detectedLocation = parsed
+      else fresh = false
+    }
+    locationEvent(fresh ? "success" : "failure")
+  }
+  Process {
+    id: autoLocationProcess
+    command: [root.pluginFile("bin/before-sunset-auto-location")]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try { root.lookupResult = JSON.parse(text) }
+        catch (e) { root.lookupResult = null }
+      }
+    }
+    onExited: Qt.callLater(root.finishLocationLookup)
+  }
+  Process {
+    id: networkWatch
+    command: ["stdbuf", "-oL", "nmcli", "monitor"]
+    running: root.autoLocationEnabled
+    stdout: SplitParser { onRead: function(line) { root.locationEvent("request") } }
+    onExited: {
+      if (root.autoLocationEnabled && root.networkWatchFailures++ < 3) networkWatchRetry.restart()
+    }
+  }
+  Timer {
+    id: networkWatchRetry
+    interval: 30000
+    onTriggered: if (root.autoLocationEnabled && !networkWatch.running) networkWatch.running = true
+  }
+  Timer {
+    id: locationRefresh
+    onTriggered: {
+      root.locationEvent("start")
+      if (root.locationState.phase === "lookup" && !autoLocationProcess.running) {
+        root.lookupResult = null
+        autoLocationProcess.running = true
+      }
+    }
+  }
+  onAutoLocationEnabledChanged: {
+    locationEvent(autoLocationEnabled ? "enable" : "disable")
+    networkWatchFailures = 0
+    networkWatchRetry.stop()
+    networkWatch.running = autoLocationEnabled
+  }
+  onDetectedLocationChanged: Qt.callLater(evaluate)
 
   // ----------------------------------------------------------------- state
 
@@ -993,7 +1066,7 @@ Item {
       if (sun) return sun
     }
 
-    return Sun.fixedSchedule(when, fixedDay, fixedNight)
+    return configAutoMode === "fixed" ? Sun.fixedSchedule(when, fixedDay, fixedNight) : null
   }
 
   function computeAutoSchedule() {
@@ -1017,11 +1090,14 @@ Item {
         autoSource = "sun"
         return sun
       }
-      // Inside the polar circles there are stretches with no sunrise or sunset
-      // at all. Fall through to the clock so the desktop keeps some rhythm
-      // instead of freezing on one theme for weeks.
+      // No solar transition is available (for example, a polar season).
+      // Hold the current theme rather than inventing fixed clock boundaries.
     }
 
+    if (configAutoMode !== "fixed") {
+      autoSource = ""
+      return null
+    }
     var fixed = Sun.fixedSchedule(now, fixedDay, fixedNight)
     autoSource = fixed ? "fixed" : ""
     return fixed
@@ -1107,7 +1183,7 @@ Item {
       // then. Applying the schedule is the honest move.
     }
 
-    if (desired === "" || currentTheme === desired) return
+    if (desired === "" || currentTheme === desired || desired === pendingTheme) return
 
     applyTheme(scheduledTheme)
   }
@@ -1177,7 +1253,7 @@ Item {
     // omarchy-theme-set serialises itself with a lock, but queueing here keeps
     // a second switch from piling up behind a slow retint.
     if (themeProcess.running) {
-      queuedTheme = slug
+      if (slug !== pendingTheme) queuedTheme = slug
       return
     }
 
@@ -1612,9 +1688,9 @@ Item {
       var data = JSON.parse(String(raw || ""))
       if (!data || typeof data !== "object") return unset
 
-      var lat = parseFloat(data.latitude)
-      var lon = parseFloat(data.longitude)
-      var hasCoordinates = !isNaN(lat) && !isNaN(lon)
+      var lat = data.latitude
+      var lon = data.longitude
+      var hasCoordinates = LocationState.coordinates(lat, lon)
 
       return {
         name: typeof data.name === "string" ? data.name.trim() : "",
@@ -1659,16 +1735,14 @@ Item {
     // same theme.
     onExited: function(exitCode) {
       if (exitCode !== 0) root.pendingTheme = ""
+      themeNameFile.reload()
       Qt.callLater(root.probeBackground)
 
-      if (root.queuedTheme !== "") {
-        var next = root.queuedTheme
-        root.queuedTheme = ""
-        // A switch that piled up while another was draining is often already
-        // satisfied by the time the first one lands. Retinting the whole
-        // desktop to the theme it is already showing is pure noise.
-        if (next !== root.currentTheme) root.applyTheme(next)
-      }
+      // Recompute from current settings; a queued target may be obsolete
+      // after a pin, pause, manual choice, or a solar boundary.
+      var hadQueued = root.queuedTheme !== ""
+      root.queuedTheme = ""
+      if (exitCode === 0 && hadQueued) Qt.callLater(root.evaluate)
     }
   }
 
@@ -1732,13 +1806,14 @@ Item {
     // all night to change, and the schedule is about to be computed from it.
     if (configMode === "auto" && configAutoMode === "sensor") probeSensor()
     probeBrightness()
+    if (autoLocationEnabled) { locationEvent("request"); networkWatchFailures = 0; if (!networkWatch.running) networkWatch.running = true }
     evaluate()
     wakeSettle.restart()
   }
 
   // Probed once at startup even when the sensor is not in use, so the panel can
   // offer the option only on machines that actually have one.
-  Component.onCompleted: { loadThemes(); probeSensor(); probeBrightness() }
+  Component.onCompleted: { loadThemes(); probeSensor(); probeBrightness(); locationEvent(autoLocationEnabled ? "enable" : "disable") }
 
   onSettingsChanged: Qt.callLater(evaluate)
   onStoredLocationChanged: Qt.callLater(evaluate)

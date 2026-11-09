@@ -1,0 +1,18 @@
+#!/bin/bash
+# Structured result: fresh location, or the last valid cache after failure.
+set -uo pipefail
+cache="$HOME/.cache/omarchy/before-sunset-location.json"
+valid='select(type == "object") | select((.latitude | type) == "number" and (.longitude | type) == "number" and .latitude >= -90 and .latitude <= 90 and .longitude >= -180 and .longitude <= 180) | {name: (if (.name | type) == "string" then .name[:120] else "" end), latitude, longitude}'
+fresh=false
+location=null
+if raw=$(curl -fsS --max-time 4 --max-filesize 4096 https://geo.omarchy.org/ 2>/dev/null) && detected=$(printf '%s' "$raw" | jq -cse "select(length == 1) | .[0] | $valid" 2>/dev/null); then
+  location=$detected
+  fresh=true
+  if mkdir -p "${cache%/*}" && tmp=$(mktemp "${cache}.XXXXXX"); then
+    trap '[[ -z ${tmp:-} ]] || unlink "$tmp" 2>/dev/null || true' EXIT
+    printf '%s\n' "$detected" > "$tmp" && mv -f "$tmp" "$cache"
+  fi
+elif [[ -f $cache ]]; then
+  location=$(jq -cse "select(length == 1) | .[0] | $valid" "$cache" 2>/dev/null) || location=null
+fi
+jq -nc --argjson fresh "$fresh" --argjson location "$location" '{fresh:$fresh, location:$location}'
